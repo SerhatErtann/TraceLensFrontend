@@ -40,6 +40,11 @@ function openService(s: ServiceCard) {
   router.push({ path: s.app === 'Service' ? '/services' : '/schedulers', query: { range: range.value, service: s.service } })
 }
 
+// Services sayfasının istek listesine, istenen sıralama/filtreyle ve doğrudan listeye inerek gider
+function openRequests(options: { sort?: 'time'; only?: 'slow' | 'errors' }) {
+  router.push({ path: '/services', query: { range: range.value, ...options }, hash: '#istekler' })
+}
+
 function scrollTo(id: string) {
   const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
   document.getElementById(id)?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' })
@@ -73,19 +78,19 @@ onUnmounted(() => window.clearInterval(timer))
   <template v-if="data">
     <div class="tiles">
       <KpiTile label="Servis" :value="`${data.totals.serviceCount} + ${data.totals.schedulerCount}`" sub="servis + scheduler"
-               hint="Servis kartlarına in" @go="scrollTo('servisler')" />
+               hint="Servisleri gör" @go="scrollTo('servisler')" />
       <KpiTile label="Toplam istek" :value="formatInt(data.totals.requestCount)"
-               :sub="`saniyede ${data.totals.requestsPerSecond.toLocaleString('tr-TR')}`" hint="İstek listesine git"
-               @go="router.push({ path: '/services', query: { range }, hash: '#istekler' })" />
+               :sub="`saniyede ort. ${data.totals.requestsPerSecond.toLocaleString('tr-TR')}`" hint="İstekleri listele"
+               @go="openRequests({ sort: 'time' })" />
       <KpiTile label="Ortalama süre" :value="formatMs(data.totals.avgMs)" :sub="`p95 ${formatMs(data.totals.p95Ms)}`"
-               hint="Süre grafiğine git" @go="router.push({ path: '/services', query: { range }, hash: '#grafik' })" />
-      <KpiTile label="Hata oranı" :value="formatPercent(data.totals.errorRate)" :sub="`${formatInt(data.totals.errorCount)} hatalı istek`"
-               :bad="data.totals.errorRate >= 0.05" hint="Hatalıları göster"
-               @go="router.push({ path: '/issues', query: { range, filter: 'error' } })" />
-      <KpiTile label="Açık sorun" :value="formatInt(data.totals.openIssueCount)"
-               :sub="data.totals.activeAlertCount ? `${data.totals.activeAlertCount} alarm açık` : 'açık alarm yok'"
-               :bad="data.totals.activeAlertCount > 0" hint="Sorunlar listesine git"
-               @go="router.push({ path: '/issues', query: { range } })" />
+               hint="Süre grafiğini aç" @go="router.push({ path: '/services', query: { range }, hash: '#grafik' })" />
+      <KpiTile label="Eşiği aşan" :value="formatInt(data.totals.slowCount)" :sub="`oran ${formatPercent(data.totals.slowRate)}`"
+               hint="Eşiği aşanları listele" @go="openRequests({ only: 'slow' })" />
+      <KpiTile label="Hatalı" :value="formatInt(data.totals.errorCount)" :sub="`oran ${formatPercent(data.totals.errorRate)}`"
+               :bad="data.totals.errorRate >= 0.05" hint="Hatalıları listele" @go="openRequests({ only: 'errors' })" />
+      <KpiTile label="Açık alarm" :value="formatInt(data.totals.activeAlertCount)"
+               :sub="data.totals.activeAlertCount ? 'müdahale bekliyor' : 'her şey normal'"
+               :bad="data.totals.activeAlertCount > 0" hint="Alarmları gör" @go="router.push('/alerts')" />
     </div>
 
     <section v-for="group in [{ id: 'servisler', title: 'Servisler', list: services }, { id: 'schedulerlar', title: `Scheduler'lar`, list: schedulers }]"

@@ -18,15 +18,15 @@ const tiles = computed(() => {
   const errorRatio = t.count ? t.errorCount / t.count : 0
   return [
     { action: 'requests' as const, label: isService ? 'Toplam istek' : 'Toplam çalışma', value: formatInt(t.count),
-      sub: '', bad: false, hint: isService ? 'İstek listesine in' : 'Çalışma listesine in' },
+      sub: '', bad: false, hint: isService ? 'İstekleri listele' : 'Çalışmaları listele' },
     { action: 'chart' as const, label: 'Ortalama süre', value: formatMs(t.avgMs),
-      sub: `eşik ${formatMs(props.thresholdMs)}${t.avgMs > props.thresholdMs ? ' · ▲ üstünde' : ''}`, bad: t.avgMs > props.thresholdMs, hint: 'Süre grafiğine in' },
+      sub: `eşik ${formatMs(props.thresholdMs)}${t.avgMs > props.thresholdMs ? ' · ▲ üstünde' : ''}`, bad: t.avgMs > props.thresholdMs, hint: 'Süre grafiğini aç' },
     { action: 'slowest' as const, label: 'p95', value: formatMs(t.p95Ms),
-      sub: `max ${formatMs(t.maxMs)}`, bad: t.p95Ms > props.thresholdMs, hint: 'En yavaşları göster' },
+      sub: `max ${formatMs(t.maxMs)}`, bad: t.p95Ms > props.thresholdMs, hint: 'En yavaşları listele' },
     { action: 'slow' as const, label: 'Eşiği aşan', value: formatInt(t.slowCount),
-      sub: formatPercent(slowRatio), bad: false, hint: 'Sadece eşiği aşanları göster' },
+      sub: `oran ${formatPercent(slowRatio)}`, bad: false, hint: 'Eşiği aşanları listele' },
     { action: 'errors' as const, label: 'Hatalı', value: formatInt(t.errorCount),
-      sub: formatPercent(errorRatio), bad: errorRatio >= 0.05, hint: 'Sadece hatalıları göster' }
+      sub: `oran ${formatPercent(errorRatio)}`, bad: errorRatio >= 0.05, hint: 'Hatalıları listele' }
   ]
 })
 </script>

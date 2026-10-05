@@ -48,10 +48,11 @@ const error = ref<string | null>(null)
 const loading = ref(false)
 const lastLoaded = ref<Date | null>(null)
 
-const sort = ref<'time' | 'duration'>('duration')
+// İstek listesi seçenekleri; Genel Bakış'tan ?only=slow|errors&sort=time ile hazır seçili gelinebilir
+const sort = ref<'time' | 'duration'>(route.query.sort === 'time' ? 'time' : 'duration')
 const offset = ref(0)
-const onlySlow = ref(false)
-const onlyErrors = ref(false)
+const onlySlow = ref(route.query.only === 'slow')
+const onlyErrors = ref(route.query.only === 'errors')
 const autoRefresh = ref(true)
 
 function scrollToSection(id: string) {

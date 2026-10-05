@@ -174,6 +174,8 @@ export interface Overview {
     p95Ms: number
     errorCount: number
     errorRate: number
+    slowCount: number
+    slowRate: number
     openIssueCount: number
     activeAlertCount: number
   }
