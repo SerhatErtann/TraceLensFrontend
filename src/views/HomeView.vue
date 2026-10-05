@@ -77,8 +77,9 @@ onUnmounted(() => window.clearInterval(timer))
 
   <template v-if="data">
     <div class="tiles">
-      <KpiTile label="Servis" :value="`${data.totals.serviceCount} + ${data.totals.schedulerCount}`" sub="servis + scheduler"
-               hint="Servisleri gör" @go="scrollTo('servisler')" />
+      <KpiTile label="Uygulama" :value="formatInt(data.totals.serviceCount + data.totals.schedulerCount)"
+               :sub="`${data.totals.serviceCount} servis · ${data.totals.schedulerCount} scheduler`"
+               hint="Uygulamaları gör" @go="scrollTo('servisler')" />
       <KpiTile label="Toplam istek" :value="formatInt(data.totals.requestCount)"
                :sub="`saniyede ort. ${data.totals.requestsPerSecond.toLocaleString('tr-TR')}`" hint="İstekleri listele"
                @go="openRequests({ sort: 'time' })" />
