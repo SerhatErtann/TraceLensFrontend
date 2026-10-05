@@ -89,6 +89,8 @@ h2 { font-size: 15px; font-weight: 600; margin: 0; }
   background: var(--surface-1);
   border: 1px solid var(--border);
   border-radius: var(--radius);
+  /* Kutulardan bir bölüme inilince başlık ekranın kenarına yapışmasın */
+  scroll-margin-top: 16px;
 }
 .card-header {
   display: flex;

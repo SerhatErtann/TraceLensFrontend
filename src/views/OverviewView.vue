@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { api, thresholdKey, type AppKind, type Filters, type OperationSummary, type PagedResult, type RequestRow,
   type ThresholdList, type TimeBucket } from '../api'
 import { formatInt } from '../format'
-import StatTiles from '../components/StatTiles.vue'
+import StatTiles, { type TileAction } from '../components/StatTiles.vue'
 import LatencyChart from '../components/LatencyChart.vue'
 import OperationsTable from '../components/OperationsTable.vue'
 import RequestsTable from '../components/RequestsTable.vue'
@@ -53,6 +53,20 @@ const offset = ref(0)
 const onlySlow = ref(false)
 const onlyErrors = ref(false)
 const autoRefresh = ref(true)
+
+function scrollToSection(id: string) {
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  document.getElementById(id)?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' })
+}
+
+// Üstteki kutular: grafiğe iner ya da istek listesini ilgili filtre/sırayla açar
+function onTile(action: TileAction) {
+  if (action === 'chart') return scrollToSection('grafik')
+  onlySlow.value = action === 'slow'
+  onlyErrors.value = action === 'errors'
+  sort.value = action === 'requests' ? 'time' : 'duration'
+  scrollToSection('istekler')
+}
 
 const title = computed(() => (props.app === 'service' ? 'Services' : 'Schedulers'))
 const subtitle = computed(() =>
@@ -179,7 +193,7 @@ onUnmounted(() => window.clearInterval(timer))
 
   <div v-if="error" class="error-box">{{ error }}</div>
 
-  <StatTiles :totals="totals" :threshold-ms="thresholdMs" />
+  <StatTiles :totals="totals" :threshold-ms="thresholdMs" :app="app" @go="onTile" />
 
   <section id="grafik" class="card section">
     <div class="card-header">

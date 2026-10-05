@@ -2,34 +2,39 @@
 import { computed } from 'vue'
 import type { OperationSummary } from '../api'
 import { formatInt, formatMs, formatPercent } from '../format'
+import KpiTile from './KpiTile.vue'
 
-const props = defineProps<{ totals: OperationSummary | null; thresholdMs: number }>()
+/** Services/Schedulers sayfasının özet kutuları. Her biri sayfadaki ilgili bölüme götürür. */
+export type TileAction = 'requests' | 'chart' | 'slowest' | 'slow' | 'errors'
+
+const props = defineProps<{ totals: OperationSummary | null; thresholdMs: number; app: 'service' | 'scheduler' }>()
+const emit = defineEmits<{ go: [action: TileAction] }>()
 
 const tiles = computed(() => {
   const t = props.totals
   if (!t) return []
+  const isService = props.app === 'service'
   const slowRatio = t.count ? t.slowCount / t.count : 0
   const errorRatio = t.count ? t.errorCount / t.count : 0
   return [
-    { label: 'Toplam istek', value: formatInt(t.count), sub: '' , alert: false },
-    { label: 'Ortalama süre', value: formatMs(t.avgMs), sub: `eşik ${formatMs(props.thresholdMs)}`, alert: t.avgMs > props.thresholdMs },
-    { label: 'p95', value: formatMs(t.p95Ms), sub: `max ${formatMs(t.maxMs)}`, alert: t.p95Ms > props.thresholdMs },
-    { label: 'Eşiği aşan', value: formatInt(t.slowCount), sub: formatPercent(slowRatio), alert: false },
-    { label: 'Hatalı', value: formatInt(t.errorCount), sub: formatPercent(errorRatio), alert: false }
+    { action: 'requests' as const, label: isService ? 'Toplam istek' : 'Toplam çalışma', value: formatInt(t.count),
+      sub: '', bad: false, hint: isService ? 'İstek listesine in' : 'Çalışma listesine in' },
+    { action: 'chart' as const, label: 'Ortalama süre', value: formatMs(t.avgMs),
+      sub: `eşik ${formatMs(props.thresholdMs)}${t.avgMs > props.thresholdMs ? ' · ▲ üstünde' : ''}`, bad: t.avgMs > props.thresholdMs, hint: 'Süre grafiğine in' },
+    { action: 'slowest' as const, label: 'p95', value: formatMs(t.p95Ms),
+      sub: `max ${formatMs(t.maxMs)}`, bad: t.p95Ms > props.thresholdMs, hint: 'En yavaşları göster' },
+    { action: 'slow' as const, label: 'Eşiği aşan', value: formatInt(t.slowCount),
+      sub: formatPercent(slowRatio), bad: false, hint: 'Sadece eşiği aşanları göster' },
+    { action: 'errors' as const, label: 'Hatalı', value: formatInt(t.errorCount),
+      sub: formatPercent(errorRatio), bad: errorRatio >= 0.05, hint: 'Sadece hatalıları göster' }
   ]
 })
 </script>
 
 <template>
   <div class="tiles">
-    <div v-for="tile in tiles" :key="tile.label" class="card tile">
-      <div class="label">{{ tile.label }}</div>
-      <div class="value">
-        {{ tile.value }}
-        <span v-if="tile.alert" class="over" title="Eşiğin üstünde">▲ eşik üstü</span>
-      </div>
-      <div class="sub muted">{{ tile.sub || ' ' }}</div>
-    </div>
+    <KpiTile v-for="tile in tiles" :key="tile.action" :label="tile.label" :value="tile.value" :sub="tile.sub"
+             :bad="tile.bad" :hint="tile.hint" @go="emit('go', tile.action)" />
   </div>
 </template>
 
@@ -39,21 +44,4 @@ const tiles = computed(() => {
   grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
   gap: 12px;
 }
-.tile { padding: 14px 16px; }
-.label { font-size: 12px; color: var(--text-secondary); }
-.value {
-  font-size: 26px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  margin-top: 2px;
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-}
-.over {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--status-critical);
-}
-.sub { font-size: 12px; }
 </style>
