@@ -109,7 +109,8 @@ function onMove(event: MouseEvent) {
   const pts = points.value
   if (!pts.length) return
   const rect = (event.currentTarget as SVGElement).getBoundingClientRect()
-  const x = event.clientX - rect.left
+  // Grafik kutuya sığdırmak için küçültülmüşse fare konumunu çizim koordinatına çevir
+  const x = (event.clientX - rect.left) * (width.value / (rect.width || width.value))
   let best = 0
   for (let i = 1; i < pts.length; i++) {
     if (Math.abs(scales.value.x(pts[i].t) - x) < Math.abs(scales.value.x(pts[best].t) - x)) best = i
@@ -136,7 +137,7 @@ const tooltipLeft = computed(() => {
 
     <div v-if="!buckets.length" class="empty">Bu aralıkta veri yok</div>
 
-    <svg v-else :width="width" :height="HEIGHT" role="img" aria-label="Yanıt süresi zaman grafiği"
+    <svg v-else :width="width" :height="HEIGHT" :viewBox="`0 0 ${width} ${HEIGHT}`" role="img" aria-label="Yanıt süresi zaman grafiği"
          @mousemove="onMove" @mouseleave="hoverIndex = null">
       <g class="grid">
         <line v-for="t in scales.yTicks" :key="t" :x1="PAD.left" :x2="width - PAD.right"
@@ -195,7 +196,8 @@ const tooltipLeft = computed(() => {
 .swatch.dashed {
   background: repeating-linear-gradient(90deg, var(--text-secondary) 0 4px, transparent 4px 7px);
 }
-svg { display: block; }
+/* Genişlik ölçülene kadar (ilk çizim, gizli sekme) kutusundan taşmasın; viewBox ile orantılı küçülür */
+svg { display: block; max-width: 100%; height: auto; }
 .grid line { stroke: var(--grid); stroke-width: 1; }
 .axis text { fill: var(--text-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
 .threshold { stroke: var(--text-secondary); stroke-width: 1.5; stroke-dasharray: 5 4; }

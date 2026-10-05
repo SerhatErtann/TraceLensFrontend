@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { api, type Overview, type ServiceCard } from '../api'
-import { formatInt, formatMs, formatPercent } from '../format'
+import { api, type Overview, type RankedOperation, type ServiceCard } from '../api'
+import { formatDateTime, formatInt, formatMs, formatPercent } from '../format'
 import { RANGES, rangeLabel } from '../ranges'
 import KpiTile from '../components/KpiTile.vue'
+import LatencyChart from '../components/LatencyChart.vue'
 import TrendSpark from '../components/TrendSpark.vue'
 
 const route = useRoute()
@@ -39,6 +40,17 @@ const setRange = (r: string) => router.replace({ query: { ...route.query, range:
 function openService(s: ServiceCard) {
   router.push({ path: s.app === 'Service' ? '/services' : '/schedulers', query: { range: range.value, service: s.service } })
 }
+
+// Listedeki bir endpoint/job'a tıklanınca o operasyona filtrelenmiş sayfa açılır
+function openOperation(o: RankedOperation) {
+  router.push({
+    path: o.app === 'Service' ? '/services' : '/schedulers',
+    query: { range: range.value, service: o.service, operation: o.operation }
+  })
+}
+
+// "En yavaş" listesindeki çubuk: ortalamanın eşiğe oranı (eşiği aşınca kırmızı)
+const thresholdShare = (o: RankedOperation) => Math.min(100, (o.avgMs / o.thresholdMs) * 100)
 
 // Services sayfasının istek listesine, istenen sıralama/filtreyle ve doğrudan listeye inerek gider
 function openRequests(options: { sort?: 'time'; only?: 'slow' | 'errors' }) {
@@ -115,6 +127,13 @@ onUnmounted(() => window.clearInterval(timer))
             <span><b>{{ formatMs(s.p95Ms) }}</b><small>p95</small></span>
             <span><b :class="{ over: s.errorRate >= 0.05 }">{{ formatPercent(s.errorRate) }}</b><small>hata</small></span>
           </span>
+          <span v-if="s.slowestOperation" class="slowest">
+            <small>En yavaş</small>
+            <span class="mono slowest-op" :title="s.slowestOperation">{{ s.slowestOperation }}</span>
+            <b :class="{ over: (s.slowestOperationAvgMs ?? 0) > (s.slowestOperationThresholdMs ?? Infinity) }">
+              {{ formatMs(s.slowestOperationAvgMs ?? 0) }}
+            </b>
+          </span>
           <span class="foot">
             {{ formatInt(s.count) }} {{ s.app === 'Service' ? 'istek' : 'çalışma' }} ·
             <span v-if="s.slowOperationCount" class="over">{{ s.slowOperationCount }} eşiği aşan</span>
@@ -123,6 +142,90 @@ onUnmounted(() => window.clearInterval(timer))
         </button>
       </div>
       <div v-else class="empty">Bu aralıkta veri yok</div>
+    </section>
+
+    <!-- Tüm uygulamaların süre seyri -->
+    <section id="sure" class="card section">
+      <div class="card-head">
+        <h2>Yanıt süresi · tüm uygulamalar</h2>
+        <RouterLink :to="{ path: '/services', query: { range } }" class="small">Servis bazında incele →</RouterLink>
+      </div>
+      <LatencyChart :buckets="data.timeline" :threshold-ms="data.timelineThresholdMs" />
+    </section>
+
+    <div class="pair section">
+      <section class="card">
+        <div class="card-head">
+          <h2>En yavaş endpoint ve job'lar</h2>
+          <span class="muted small">ortalama süre · çubuk: eşiğe oranı</span>
+        </div>
+        <table v-if="data.slowestOperations.length" class="data">
+          <tbody>
+            <tr v-for="o in data.slowestOperations" :key="o.app + o.service + o.operation" class="clickable" @click="openOperation(o)">
+              <td class="op-cell">
+                <div class="mono op" :title="o.operation">{{ o.operation }}</div>
+                <div class="muted tiny">{{ o.service }}{{ o.app === 'Scheduler' ? ' · job' : '' }} · {{ formatInt(o.count) }} {{ o.app === 'Service' ? 'istek' : 'çalışma' }}</div>
+              </td>
+              <td class="bar-cell">
+                <div class="bar" :title="`Eşik ${formatMs(o.thresholdMs)}`">
+                  <i :class="{ over: o.avgMs > o.thresholdMs }" :style="{ width: `${Math.max(thresholdShare(o), 2)}%` }" />
+                </div>
+                <div class="muted tiny">eşik {{ formatMs(o.thresholdMs) }}</div>
+              </td>
+              <td class="num" :class="{ over: o.avgMs > o.thresholdMs }">{{ formatMs(o.avgMs) }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <div v-else class="empty">Bu aralıkta veri yok</div>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <h2>En çok hata verenler</h2>
+          <span class="muted small">hatalı istek sayısı</span>
+        </div>
+        <table v-if="data.mostErrors.length" class="data">
+          <tbody>
+            <tr v-for="o in data.mostErrors" :key="o.app + o.service + o.operation" class="clickable" @click="openOperation(o)">
+              <td class="op-cell">
+                <div class="mono op" :title="o.operation">{{ o.operation }}</div>
+                <div class="muted tiny">{{ o.service }}{{ o.app === 'Scheduler' ? ' · job' : '' }}</div>
+              </td>
+              <td class="num">
+                <b>{{ formatInt(o.errorCount) }}</b>
+                <div class="tiny" :class="o.errorRate >= 0.05 ? 'over' : 'muted'">oran {{ formatPercent(o.errorRate) }}</div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <div v-else class="empty">Bu aralıkta hata yok</div>
+      </section>
+    </div>
+
+    <section class="card section">
+      <div class="card-head">
+        <h2>Son hatalar</h2>
+        <RouterLink :to="{ path: '/services', query: { range, only: 'errors', sort: 'time' }, hash: '#istekler' }" class="small">
+          Tüm hatalı istekler →
+        </RouterLink>
+      </div>
+      <div v-if="data.recentErrors.length" class="table-wrap">
+      <table class="data recent">
+        <thead>
+          <tr><th>Zaman</th><th>Uygulama</th><th>Operasyon</th><th>Hata</th><th class="num">Süre</th></tr>
+        </thead>
+        <tbody>
+          <tr v-for="e in data.recentErrors" :key="e.traceId + e.timestamp" class="clickable" @click="router.push(`/traces/${e.traceId}`)">
+            <td class="nowrap secondary">{{ formatDateTime(e.timestamp) }}</td>
+            <td class="secondary">{{ e.service }}</td>
+            <td class="mono op">{{ e.operation }}</td>
+            <td><span class="err-text" :title="e.error">⚠ {{ e.error }}</span></td>
+            <td class="num">{{ formatMs(e.durationMs) }}</td>
+          </tr>
+        </tbody>
+      </table>
+      </div>
+      <div v-else class="empty">Bu aralıkta hatalı istek yok</div>
     </section>
   </template>
   <div v-else-if="!error" class="empty">Yükleniyor…</div>
@@ -140,6 +243,22 @@ onUnmounted(() => window.clearInterval(timer))
 .segmented button.active { background: var(--accent); color: #fff; }
 .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
 .section { margin-top: 16px; scroll-margin-top: 16px; }
+.pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; }
+.pair > .card { min-width: 0; }
+.tiny { font-size: 11.5px; }
+.nowrap { white-space: nowrap; }
+.op-cell { min-width: 0; max-width: 0; width: 60%; }
+.op { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bar-cell { width: 30%; min-width: 90px; }
+.bar { height: 8px; border-radius: 4px; background: var(--surface-2); overflow: hidden; }
+.bar i { display: block; height: 100%; border-radius: 4px; background: var(--accent); }
+.bar i.over { background: var(--status-critical); }
+.err-text { color: var(--status-critical); font-weight: 500; display: inline-block; max-width: 360px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+.recent .op { max-width: 320px; }
+.slowest { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 6px; align-items: baseline; font-size: 12px; padding-top: 6px; border-top: 1px solid var(--border); }
+.slowest small { color: var(--text-muted); font-size: 11px; }
+.slowest-op { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; }
+.slowest b { font-variant-numeric: tabular-nums; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 12px; padding: 0 16px 16px; }
 .svc {
   position: relative;

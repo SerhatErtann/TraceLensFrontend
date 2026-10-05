@@ -159,9 +159,34 @@ export interface ServiceCard {
   errorCount: number
   errorRate: number
   slowOperationCount: number
+  slowestOperation: string | null
+  slowestOperationAvgMs: number | null
+  slowestOperationThresholdMs: number | null
   thresholdMs: number
   /** Eşit aralıklı ortalama süreler; null = o aralıkta istek yok */
   trend: (number | null)[]
+}
+
+export interface RankedOperation {
+  app: 'Service' | 'Scheduler'
+  service: string
+  operation: string
+  count: number
+  avgMs: number
+  p95Ms: number
+  thresholdMs: number
+  errorCount: number
+  errorRate: number
+}
+
+export interface RecentError {
+  app: 'Service' | 'Scheduler'
+  timestamp: string
+  traceId: string
+  service: string
+  operation: string
+  durationMs: number
+  error: string
 }
 
 export interface Overview {
@@ -180,6 +205,11 @@ export interface Overview {
     activeAlertCount: number
   }
   services: ServiceCard[]
+  timeline: TimeBucket[]
+  timelineThresholdMs: number
+  slowestOperations: RankedOperation[]
+  mostErrors: RankedOperation[]
+  recentErrors: RecentError[]
   from: string
   to: string
   trendBucketSeconds: number
