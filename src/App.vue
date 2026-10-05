@@ -1,17 +1,35 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { api } from './api'
+import { auth, markLoggedOut } from './auth'
+
+const route = useRoute()
+const router = useRouter()
+const isLoginPage = computed(() => route.path === '/login')
 
 const activeAlerts = ref(0)
 let timer: number | undefined
 
 async function refreshAlerts() {
+  // Oturum durumu öğrenilmeden istek atılmaz; aksi halde 401 erken yönlendirmeye yol açar.
+  if (!auth.loaded || isLoginPage.value || (auth.authEnabled && !auth.authenticated)) return
   try {
     activeAlerts.value = (await api.alerts()).active.length
   } catch {
     // Menü rozeti kritik değil; API kapalıysa sessizce geç.
   }
 }
+
+async function logout() {
+  await api.logout().catch(() => {})
+  markLoggedOut()
+  activeAlerts.value = 0
+  router.replace('/login')
+}
+
+// Oturum durumu öğrenilince / giriş sayfasından çıkılınca rozet hemen dolsun
+watch(() => [auth.loaded, auth.authenticated, isLoginPage.value], refreshAlerts)
 
 onMounted(() => {
   refreshAlerts()
@@ -21,7 +39,8 @@ onUnmounted(() => window.clearInterval(timer))
 </script>
 
 <template>
-  <div class="shell">
+  <RouterView v-if="isLoginPage" />
+  <div v-else class="shell">
     <nav class="sidebar">
       <div class="brand">
         <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
@@ -37,6 +56,10 @@ onUnmounted(() => window.clearInterval(timer))
         <span v-if="activeAlerts" class="badge" :aria-label="`${activeAlerts} aktif alarm`">{{ activeAlerts }}</span>
       </RouterLink>
       <RouterLink to="/settings" class="nav-item">Ayarlar</RouterLink>
+      <div v-if="auth.authEnabled && auth.authenticated" class="user">
+        <span class="muted" :title="`Oturum: ${auth.username}`">{{ auth.username }}</span>
+        <button class="btn small" @click="logout">Çıkış</button>
+      </div>
     </nav>
     <main class="content">
       <RouterView />
@@ -81,6 +104,21 @@ onUnmounted(() => window.clearInterval(timer))
 }
 .nav-item:hover { background: var(--surface-2); text-decoration: none; }
 .nav-item.router-link-active { background: var(--accent-soft); color: var(--text-primary); }
+.user {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 10px 0;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+}
+.user span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.btn.small { padding: 2px 10px; font-size: 12px; }
+@media (max-width: 760px) {
+  .user { margin-top: 0; margin-left: auto; border-top: none; padding: 0 10px; }
+}
 .badge {
   background: var(--status-critical);
   color: #fff;

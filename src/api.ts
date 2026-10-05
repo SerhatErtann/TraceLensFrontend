@@ -149,9 +149,19 @@ interface DataResponse<T> extends BaseResponse {
   data: T
 }
 
+export interface AuthStatus {
+  authEnabled: boolean
+  authenticated: boolean
+  username: string | null
+}
+
 const BASE = '/api/v1'
 
 type Params = Record<string, string | number | boolean | undefined | null>
+
+// Oturum düştüğünde (401) çağrılır; main.ts giriş sayfasına yönlendirir. Döngüsel import olmasın diye burada tutulur.
+let unauthorizedHandler: (() => void) | null = null
+export const onUnauthorized = (handler: () => void) => { unauthorizedHandler = handler }
 
 async function request<R extends BaseResponse>(path: string, init?: RequestInit, params: Params = {}): Promise<R> {
   const query = new URLSearchParams()
@@ -160,7 +170,12 @@ async function request<R extends BaseResponse>(path: string, init?: RequestInit,
   }
   const qs = query.toString()
   const response = await fetch(`${BASE}${path}${qs ? `?${qs}` : ''}`, init)
-  if (!response.ok) throw new Error(`${response.status} ${response.statusText} (${path})`)
+  if (response.status === 401) unauthorizedHandler?.()
+  if (!response.ok) {
+    // 401/429 gibi yanıtlar da { isSuccess, message } gövdesiyle gelir; varsa o mesajı göster
+    const failure = (await response.json().catch(() => null)) as BaseResponse | null
+    throw new Error(failure?.message ?? `${response.status} ${response.statusText} (${path})`)
+  }
   const body = (await response.json()) as R
   // İş hatası (ör. "Trace bulunamadı") 200 ile gelir; mesajı olduğu gibi kullanıcıya göster.
   if (!body.isSuccess) throw new Error(body.message)
@@ -169,7 +184,7 @@ async function request<R extends BaseResponse>(path: string, init?: RequestInit,
 
 const get = async <T>(path: string, params: Params = {}) => (await request<DataResponse<T>>(path, undefined, params)).data
 
-const send = async <T>(method: 'PUT' | 'DELETE', path: string, body?: unknown, params: Params = {}) =>
+const send = async <T>(method: 'POST' | 'PUT' | 'DELETE', path: string, body?: unknown, params: Params = {}) =>
   (await request<DataResponse<T>>(path, {
     method,
     headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
@@ -197,5 +212,10 @@ export const api = {
   setThreshold: (service: string, operation: string, thresholdMs: number) =>
     send<ThresholdList>('PUT', '/thresholds', { service, operation, thresholdMs }),
   deleteThreshold: (service: string, operation: string) =>
-    send<ThresholdList>('DELETE', '/thresholds', undefined, { service, operation })
+    send<ThresholdList>('DELETE', '/thresholds', undefined, { service, operation }),
+
+  // Giriş
+  authStatus: () => get<AuthStatus>('/auth/me'),
+  login: (username: string, password: string) => send<AuthStatus>('POST', '/auth/login', { username, password }),
+  logout: async () => { await request<BaseResponse>('/auth/logout', { method: 'POST' }) }
 }

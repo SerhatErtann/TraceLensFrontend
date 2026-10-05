@@ -24,6 +24,9 @@ Durdurmak için terminalde Ctrl+C.
 | Trace detayı | `/traces/:traceId` | Waterfall (servis renkleri, kendi süresi, aç/kapa), "Nereye bakmalı?" ipuçları, attribute'lar, exception stack trace |
 | Alarmlar | `/alerts` | Açık ve kapanan alarmlar, test bildirimi butonu |
 | Ayarlar | `/settings` | Varsayılan eşik, özel eşiklerin listesi (düzenle/kaldır), alarm ayarlarının özeti |
+| Giriş | `/login` | TraceLensService'te şifre tanımlıysa açılır; girişten sonra istenen sayfaya döner. Menüde kullanıcı adı ve Çıkış |
+
+Oturum düşerse (API 401 döner) bulunulan sayfaya geri dönecek şekilde giriş ekranı açılır (`src/auth.ts`, `router.ts`).
 
 Filtreler URL'de tutulur; bir görünümün linkini kopyalayıp paylaşabilirsiniz.
 
