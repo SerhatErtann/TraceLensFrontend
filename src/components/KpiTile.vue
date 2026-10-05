@@ -1,6 +1,8 @@
 <script setup lang="ts">
-/** Tıklanınca ilgili sayfaya/bölüme götüren özet kutusu. Nereye gittiği altta yazar. */
-defineProps<{ label: string; value: string; sub?: string; bad?: boolean; hint: string }>()
+import type { Delta } from '../format'
+
+/** Tıklanınca ilgili sayfaya/bölüme götüren özet kutusu. Nereye gittiği altta yazar; varsa önceki döneme göre değişim. */
+defineProps<{ label: string; value: string; sub?: string; bad?: boolean; hint: string; delta?: Delta | null }>()
 defineEmits<{ go: [] }>()
 </script>
 
@@ -9,7 +11,8 @@ defineEmits<{ go: [] }>()
     <span class="arrow" aria-hidden="true">→</span>
     <span class="label">{{ label }}</span>
     <span class="value">{{ value }}</span>
-    <span class="sub" :class="{ bad }">{{ sub || ' ' }}</span>
+    <span class="sub" :class="{ bad }">{{ sub || ' ' }}</span>
+    <span v-if="delta" class="delta" :class="delta.tone">{{ delta.text }}</span>
     <span class="hint">{{ hint }}</span>
   </button>
 </template>
@@ -33,6 +36,10 @@ defineEmits<{ go: [] }>()
 .value { font-size: 26px; font-weight: 600; font-variant-numeric: tabular-nums; margin-top: 2px; }
 .sub { font-size: 12px; color: var(--text-muted); }
 .sub.bad { color: var(--status-critical); font-weight: 600; }
-.hint { font-size: 11.5px; color: var(--accent); margin-top: 6px; }
+.delta { font-size: 11.5px; margin-top: 2px; font-variant-numeric: tabular-nums; color: var(--text-muted); }
+.delta.bad { color: var(--status-critical); }
+.delta.good { color: var(--status-good); }
+/* Yan yana kutularda "nereye gider" satırı hep en altta hizalı */
+.hint { font-size: 11.5px; color: var(--accent); margin-top: auto; padding-top: 6px; }
 @media (prefers-reduced-motion: reduce) { .arrow { transition: none; } }
 </style>

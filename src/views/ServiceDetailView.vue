@@ -1,13 +1,18 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { api, spanGroupKey, thresholdKey, type AppKind, type OperationSummary, type RequestRow, type ServiceBreakdown,
-  type SpanCategory, type SpanGroup, type ThresholdList, type TimeBucket, type TimeSplit } from '../api'
-import { formatInt, formatMs, formatPercent } from '../format'
-import { RANGES, rangeLabel } from '../ranges'
+import { api, spanGroupKey, thresholdKey, type Anatomy, type AppKind, type Histogram, type Instance, type OperationSummary,
+  type Outcome, type RequestRow, type ServiceBreakdown, type SpanCategory, type SpanGroup, type ThresholdList, type TimeBucket } from '../api'
+import { formatInt, formatPercent } from '../format'
+import { previousWindow, RANGES, rangeLabel, rangeMs, shiftBuckets } from '../ranges'
 import StatTiles, { type TileAction } from '../components/StatTiles.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import LatencyChart from '../components/LatencyChart.vue'
+import TimeSplitBar from '../components/TimeSplitBar.vue'
+import DurationHistogram from '../components/DurationHistogram.vue'
+import OutcomeBreakdown from '../components/OutcomeBreakdown.vue'
+import InstancesTable from '../components/InstancesTable.vue'
+import RequestAnatomy from '../components/RequestAnatomy.vue'
 import OperationsTable from '../components/OperationsTable.vue'
 import SpanGroupsTable from '../components/SpanGroupsTable.vue'
 import RequestsTable from '../components/RequestsTable.vue'
@@ -27,8 +32,14 @@ const listPath = computed(() => (isService.value ? '/services' : '/schedulers'))
 
 const operations = ref<OperationSummary[]>([])
 const totals = ref<OperationSummary | null>(null)
+const previousTotals = ref<OperationSummary | null>(null)
 const buckets = ref<TimeBucket[]>([])
+const previousBuckets = ref<TimeBucket[]>([])
 const breakdown = ref<ServiceBreakdown | null>(null)
+const histogram = ref<Histogram | null>(null)
+const outcomes = ref<Outcome | null>(null)
+const instances = ref<Instance[] | null>(null)
+const anatomy = ref<Anatomy | null>(null)
 const thresholds = ref<ThresholdList | null>(null)
 const error = ref<string | null>(null)
 const loading = ref(false)
@@ -57,15 +68,7 @@ const status = computed(() => {
   return { kind: 'ok' as const, label: 'Normal' }
 })
 
-const SPLIT_META: Record<TimeSplit['category'], { label: string; color: string }> = {
-  own: { label: 'Kendi kodu', color: 'var(--series-1)' },
-  call: { label: 'Başka servislere çağrılar', color: 'var(--series-2)' },
-  db: { label: 'Veritabanı', color: 'var(--series-3)' },
-  other: { label: 'Diğer', color: 'var(--border-strong)' }
-}
-const splitParts = computed(() =>
-  (breakdown.value?.timeSplit ?? []).filter(p => p.share > 0).map(p => ({ ...p, ...SPLIT_META[p.category] })))
-const splitAria = computed(() => splitParts.value.map(p => `${p.label} ${formatPercent(p.share)}`).join(', '))
+const hasSplit = computed(() => (breakdown.value?.timeSplit ?? []).some(p => p.share > 0))
 
 // Sürenin büyük kısmı tek bir çağrı/sorguda geçiyorsa bir cümleyle söylenir (tıklayınca o satır açılır)
 const dominant = computed(() => {
@@ -92,19 +95,30 @@ const samplesThreshold = computed(() => selectedOperation.value?.thresholdMs ?? 
 async function load() {
   loading.value = true
   const f = { range: range.value, service: props.service }
+  const previous = { ...f, ...previousWindow(range.value) }
   try {
-    const [ops, tot, ts, bd, thr] = await Promise.all([
+    const [ops, tot, ts, bd, thr, prevTot, prevTs, hist, out, inst] = await Promise.all([
       api.summary(props.app, f),
       api.totals(props.app, f),
       api.timeseries(props.app, f),
       api.breakdown(props.app, props.service, range.value),
-      api.thresholds()
+      api.thresholds(),
+      api.totals(props.app, previous),
+      api.timeseries(props.app, previous),
+      api.histogram(props.app, f),
+      api.outcomes(props.app, f),
+      api.instances(props.app, f)
     ])
     operations.value = ops
     totals.value = tot
     buckets.value = ts
     breakdown.value = bd
     thresholds.value = thr
+    previousTotals.value = prevTot
+    previousBuckets.value = shiftBuckets(prevTs, rangeMs(range.value))
+    histogram.value = hist
+    outcomes.value = out
+    instances.value = inst
     error.value = null
     lastLoaded.value = new Date()
   } catch (e) {
@@ -118,8 +132,15 @@ async function loadSamples() {
   samplesError.value = null
   try {
     if (selectedOperation.value) {
-      const f = { range: range.value, service: props.service, operation: selectedOperation.value.operation }
-      samples.value = (await api.requests(props.app, f, 'duration', SAMPLE_LIMIT, 0)).items
+      const operation = selectedOperation.value.operation
+      const f = { range: range.value, service: props.service, operation }
+      anatomy.value = null
+      const [page, anat] = await Promise.all([
+        api.requests(props.app, f, 'duration', SAMPLE_LIMIT, 0),
+        api.anatomy(props.app, props.service, operation, range.value)
+      ])
+      samples.value = page.items
+      anatomy.value = anat
     } else if (selectedGroup.value) {
       samples.value = await api.spanSamples(props.app, props.service, selectedGroup.value, range.value)
     }
@@ -132,13 +153,19 @@ function clearSelection() {
   selectedOperation.value = null
   selectedGroup.value = null
   samples.value = null
+  anatomy.value = null
+}
+
+// Grafikte bir noktaya tıklanınca o aralığın istekleri Servisler/Görevler sayfasında bu servise filtreli listelenir
+function onChartSelect(w: { from: string; to: string }) {
+  router.push({ path: listPath.value, query: { range: range.value, service: props.service, windowFrom: w.from, windowTo: w.to }, hash: '#istekler' })
 }
 
 async function showSamples() {
   samples.value = null
   await loadSamples()
   await nextTick()
-  document.getElementById('ornekler')?.scrollIntoView({ behavior: reduceMotion() ? 'auto' : 'smooth', block: 'nearest' })
+  document.getElementById(selectedOperation.value ? 'anatomi' : 'ornekler')?.scrollIntoView({ behavior: reduceMotion() ? 'auto' : 'smooth', block: 'nearest' })
 }
 
 function selectOperation(row: OperationSummary) {
@@ -220,23 +247,15 @@ onUnmounted(() => window.clearInterval(timer))
 
   <div v-if="error" class="error-box">{{ error }}</div>
 
-  <StatTiles :totals="totals" :threshold-ms="thresholdMs" :app="app" @go="onTile" />
+  <StatTiles :totals="totals" :threshold-ms="thresholdMs" :app="app" :previous="previousTotals" @go="onTile" />
 
   <section class="card section">
     <div class="card-header">
       <h2>Süre nereye gidiyor?</h2>
       <span class="muted small">{{ isService ? 'Bu servise gelen isteklerin' : 'Görev çalışmalarının' }} toplam süresinin dağılımı</span>
     </div>
-    <div v-if="splitParts.length" class="split">
-      <div class="bar" role="img" :aria-label="splitAria">
-        <i v-for="p in splitParts" :key="p.category" :style="{ width: `${p.share * 100}%`, background: p.color }" :title="`${p.label} ${formatPercent(p.share)}`" />
-      </div>
-      <div class="legend">
-        <span v-for="p in splitParts" :key="p.category">
-          <i :style="{ background: p.color }" />{{ p.label }} <b>{{ formatPercent(p.share) }}</b>
-          <span class="muted">{{ formatMs(p.totalMs) }}</span>
-        </span>
-      </div>
+    <div v-if="breakdown && hasSplit" class="split">
+      <TimeSplitBar :parts="breakdown.timeSplit" />
       <button v-if="dominant" type="button" class="insight" @click="openDominant">
         En büyük pay ({{ formatPercent(dominant.share) }}):
         <span class="mono">{{ dominant.target ? `${dominant.target} · ` : '' }}{{ dominant.name }}</span>
@@ -249,10 +268,27 @@ onUnmounted(() => window.clearInterval(timer))
   <section id="grafik" class="card section">
     <div class="card-header">
       <h2>Yanıt süresi</h2>
-      <span class="muted small">{{ isService ? "Tüm endpoint'ler" : 'Tüm görevler' }}</span>
+      <span class="muted small">{{ isService ? "Tüm endpoint'ler" : 'Tüm görevler' }} · kesikli: önceki {{ rangeLabel(range) }}</span>
     </div>
-    <LatencyChart :buckets="buckets" :threshold-ms="thresholdMs" />
+    <LatencyChart :buckets="buckets" :threshold-ms="thresholdMs" :previous="previousBuckets" drillable @select="onChartSelect" />
   </section>
+
+  <div class="pair section">
+    <section class="card">
+      <div class="card-header">
+        <h2>Süre dağılımı</h2>
+        <span class="muted small">kaç {{ isService ? 'istek' : 'çalışma' }} hangi sürede</span>
+      </div>
+      <DurationHistogram :data="histogram" :threshold-ms="thresholdMs" />
+    </section>
+    <section class="card">
+      <div class="card-header">
+        <h2>Sonuçlar</h2>
+        <span class="muted small">{{ isService ? 'durum kodları ve hata türleri' : 'başarılı / başarısız ve hata türleri' }}</span>
+      </div>
+      <OutcomeBreakdown :data="outcomes" :app="app" />
+    </section>
+  </div>
 
   <section id="detay" class="card section">
     <div class="tabs" role="tablist" aria-label="Servis içi dağılım">
@@ -261,7 +297,7 @@ onUnmounted(() => window.clearInterval(timer))
       </button>
     </div>
     <p class="muted small hint">
-      Satıra tıklayınca en yavaş {{ SAMPLE_LIMIT }} örneği aşağıda listelenir
+      Satıra tıklayınca {{ tab === 'ops' ? `isteğin anatomisi ve ` : '' }}en yavaş {{ SAMPLE_LIMIT }} örneği aşağıda listelenir
       <template v-if="tab === 'ops'"> · eşiği değiştirmek için ✎</template>
       <template v-else> · "Toplam sürenin payı": bu satırın, isteklerin toplam süresi içindeki yeri</template>
     </p>
@@ -270,6 +306,14 @@ onUnmounted(() => window.clearInterval(timer))
                      @select="selectOperation" @threshold-changed="load" />
     <SpanGroupsTable v-else :rows="groupRows" :category="tab"
                      :selected="selectedGroup ? spanGroupKey(selectedGroup) : undefined" @select="selectGroup" />
+  </section>
+
+  <section v-if="selectedOperation" id="anatomi" class="card section">
+    <div class="card-header">
+      <h2>{{ isService ? 'İsteğin' : 'Çalışmanın' }} anatomisi <span class="muted count mono">{{ selectedOperation.operation }}</span></h2>
+      <span class="muted small">ortalama bir {{ isService ? 'istek' : 'çalışma' }} hangi adımlardan oluşuyor</span>
+    </div>
+    <RequestAnatomy :data="anatomy" :app="app" />
   </section>
 
   <section v-if="selectedOperation || selectedGroup" id="ornekler" class="card section">
@@ -285,6 +329,15 @@ onUnmounted(() => window.clearInterval(timer))
     </div>
     <div v-if="samplesError" class="error-box">{{ samplesError }}</div>
     <RequestsTable v-else-if="samples" :rows="samples" :app="app" :threshold-for="() => samplesThreshold" />
+    <div v-else class="empty">Yükleniyor…</div>
+  </section>
+
+  <section class="card section">
+    <div class="card-header">
+      <h2>Instance'lar <span v-if="instances" class="muted count">{{ instances.length }}</span></h2>
+      <span class="muted small">servisin çalışan kopyaları; biri diğerlerinden yavaşsa işaretlenir</span>
+    </div>
+    <InstancesTable v-if="instances" :rows="instances" :threshold-ms="thresholdMs" />
     <div v-else class="empty">Yükleniyor…</div>
   </section>
 </template>
@@ -304,14 +357,7 @@ onUnmounted(() => window.clearInterval(timer))
 .crumb { display: inline-block; font-size: 13px; margin-bottom: 8px; }
 .title { font-size: 20px; font-weight: 600; overflow-wrap: anywhere; }
 
-/* Süre dağılımı: tek yatay çubuk + açıklama */
 .split { padding: 4px 16px 16px; }
-.split .bar { display: flex; height: 22px; border-radius: 4px; overflow: hidden; gap: 2px; }
-.split .bar i { display: block; height: 100%; min-width: 3px; }
-.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 10px; font-size: 12.5px; color: var(--text-secondary); }
-.legend > span { display: inline-flex; align-items: center; gap: 6px; }
-.legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
-.legend b { color: var(--text-primary); font-variant-numeric: tabular-nums; }
 .insight { display: block; margin-top: 12px; padding: 0; border: none; background: none; color: var(--accent); cursor: pointer; text-align: left; font-size: 13px; }
 .insight:hover { text-decoration: underline; }
 

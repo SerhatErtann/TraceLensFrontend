@@ -102,6 +102,11 @@ h2 { font-size: 15px; font-weight: 600; margin: 0; }
 
 .table-wrap { overflow-x: auto; }
 
+/* Yan yana iki kart (Genel Bakış'taki en yavaş / en çok hata, Servisler'deki süre dağılımı / sonuçlar); dar ekranda alt alta */
+.pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; }
+.pair > .card { min-width: 0; }
+@media (max-width: 760px) { .pair { grid-template-columns: minmax(0, 1fr); } }
+
 /* Liste başlığındaki filtre kutuları ("Sadece eşiği aşanlar / Sadece hatalılar") — tüm sayfalarda aynı */
 .list-controls { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; font-size: 13px; }
 .list-controls label { display: flex; align-items: center; gap: 5px; }

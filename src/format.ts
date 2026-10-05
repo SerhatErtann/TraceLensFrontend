@@ -35,6 +35,25 @@ export function formatPercent(ratio: number): string {
   return `%${(ratio * 100).toLocaleString('tr-TR', { maximumFractionDigits: 1 })}`
 }
 
+export type DeltaTone = 'bad' | 'good' | 'neutral'
+export interface Delta { text: string; tone: DeltaTone }
+
+/**
+ * Önceki döneme göre değişim: "▲ %12 · önceki 162 ms". %5'ten küçük değişim "≈" ve nötr.
+ * higherIsWorse null ise (istek sayısı gibi) yön renklendirilmez.
+ */
+export function compare(current: number, previous: number, previousText: string, higherIsWorse: boolean | null): Delta {
+  if (!previous) return { text: 'önceki dönemde veri yok', tone: 'neutral' }
+  const change = (current - previous) / previous
+  if (Math.abs(change) < 0.05) return { text: `≈ önceki ${previousText}`, tone: 'neutral' }
+  const pct = `%${Math.round(Math.abs(change) * 100).toLocaleString('tr-TR')}`
+  const worse = change > 0 === higherIsWorse
+  return {
+    text: `${change > 0 ? '▲' : '▼'} ${pct} · önceki ${previousText}`,
+    tone: higherIsWorse === null ? 'neutral' : worse ? 'bad' : 'good'
+  }
+}
+
 export function relativeTime(value: string): string {
   const seconds = Math.round((Date.now() - parseUtc(value).getTime()) / 1000)
   if (seconds < 60) return `${seconds} sn önce`

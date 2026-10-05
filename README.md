@@ -22,9 +22,10 @@ Durdurmak için terminalde Ctrl+C.
 |---|---|---|
 | Genel Bakış | `/overview` | Girişte açılan sayfa. Tıklanabilir özet kutuları (uygulama, istek, süre, eşiği aşan, hatalı, alarm); Servisler ve Görevler kartları (her bölümde en fazla 5, fazlası için "Tümünü gör"): durum, eşik çizgili süre grafiği, ortalama/p95/hata, en yavaş endpoint. Altta tüm uygulamaların süre grafiği, en yavaş / en çok hata veren 5 ve son hatalar |
 | Sorunlar | `/issues` | Sadece ortalaması eşiği aşanlar ve hata oranı %5'i geçenler, nedeniyle (en sık hata dahil). Filtre: alarm açık / yavaş / hatalı / servis. Satıra tıklayınca en kötü örneğin trace'i açılır |
-| Servisler | `/services` | Gelen HTTP istekleri: özet kutuları, ortalama/p95 grafiği (eşik çizgisiyle), endpoint tablosu (eşik ✎ ile yerinde düzenlenir), istek listesi (hatalı satırlar kırmızı, eşiği aşanlar turuncu şeritli) |
+| Servis haritası | `/map` | Kim kimi çağırıyor: görevler → servisler → veritabanları; oklarda çağrı sayısı, ortalama süre, hata oranı. Altta bağlantı tablosu |
+| Servisler | `/services` | Gelen HTTP istekleri: özet kutuları (önceki döneme göre değişim), süre grafiği (ortalama ve seçilebilir p50/p90/p95/p99, önceki dönem kesikli, altta istek/hata çubukları; noktaya tıklayınca o aralığın istekleri), süre dağılımı histogramı, durum kodları ve hata türleri, endpoint tablosu (eşik ✎ ile yerinde düzenlenir), istek listesi (hatalı satırlar kırmızı, eşiği aşanlar turuncu şeritli) |
 | Görevler | `/schedulers` | Aynı ekran, zamanlanmış görev (scheduler) çalışmaları için |
-| Servis Detayı | `/services/:service`, `/schedulers/:service` | Genel Bakış kartından açılır. Özet kutuları, "Süre nereye gidiyor?" (kendi kodu / başka servislere çağrılar / veritabanı), süre grafiği; sekmeler: Endpoint'ler (Görevler), Metodlar, DB sorguları (N+1 şüphesi işaretli), Dış çağrılar. Satıra tıklayınca en yavaş 10 örnek ve trace linkleri |
+| Servis Detayı | `/services/:service`, `/schedulers/:service` | Genel Bakış kartından açılır. Özet kutuları, "Süre nereye gidiyor?" (kendi kodu / başka servislere çağrılar / veritabanı), süre grafiği; sekmeler: Endpoint'ler (Görevler), Metodlar, DB sorguları (N+1 şüphesi işaretli), Dış çağrılar. Endpoint seçilince isteğin anatomisi (ortalama bir istekte her adım kaç kez, ne kadar). Satıra tıklayınca en yavaş 10 örnek ve trace linkleri. Süre dağılımı, sonuçlar ve instance'lar |
 | Trace detayı | `/traces/:traceId` | Waterfall (servis renkleri, kendi süresi, aç/kapa), "Nereye bakmalı?" ipuçları, attribute'lar, exception stack trace |
 | Alarmlar | `/alerts` | Açık ve kapanan alarmlar, test bildirimi butonu |
 | Ayarlar | `/settings` | Varsayılan eşik, özel eşiklerin listesi (düzenle/kaldır), alarm ayarlarının özeti |
@@ -43,9 +44,10 @@ src/
 ├─ router.ts
 ├─ styles.css        Renk token'ları (açık/koyu tema)
 ├─ ranges.ts         Ortak zaman aralığı seçenekleri
-├─ views/            HomeView (Genel Bakış), IssuesView (Sorunlar), OverviewView (Services + Schedulers), ServiceDetailView,
+├─ views/            HomeView (Genel Bakış), IssuesView (Sorunlar), OverviewView (Services + Schedulers), ServiceDetailView, ServiceMapView,
 │                    TraceView, AlertsView, SettingsView, LoginView
-└─ components/       KpiTile, TrendSpark, LatencyChart, OperationsTable, SpanGroupsTable, RequestsTable, StatTiles,
+└─ components/       KpiTile, TrendSpark, LatencyChart, OperationsTable, SpanGroupsTable, RequestsTable, StatTiles, DurationHistogram,
+                     OutcomeBreakdown, InstancesTable, RequestAnatomy, TimeSplitBar,
                      StatusBadge, ThresholdCell, Waterfall
 ```
 

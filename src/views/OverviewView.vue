@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { api, thresholdKey, type AppKind, type Filters, type OperationSummary, type PagedResult, type RequestRow,
-  type ThresholdList, type TimeBucket } from '../api'
-import { formatInt } from '../format'
+import { api, thresholdKey, type AppKind, type Filters, type Histogram, type OperationSummary, type Outcome, type PagedResult,
+  type RequestRow, type ThresholdList, type TimeBucket } from '../api'
+import { formatDateTime, formatInt, formatTime } from '../format'
+import { previousWindow, rangeLabel, rangeMs, shiftBuckets } from '../ranges'
 import StatTiles, { type TileAction } from '../components/StatTiles.vue'
 import LatencyChart from '../components/LatencyChart.vue'
+import DurationHistogram from '../components/DurationHistogram.vue'
+import OutcomeBreakdown from '../components/OutcomeBreakdown.vue'
 import OperationsTable from '../components/OperationsTable.vue'
 import RequestsTable from '../components/RequestsTable.vue'
 
@@ -30,7 +33,7 @@ const filters = computed<Filters>(() => ({
   minDurationMs: route.query.minDurationMs ? Number(route.query.minDurationMs) : undefined
 }))
 
-function setFilter(patch: Partial<Record<keyof Filters, string | number | undefined>>) {
+function setFilter(patch: Partial<Record<keyof Filters | 'windowFrom' | 'windowTo', string | number | undefined>>) {
   const query: Record<string, string> = {}
   for (const [k, v] of Object.entries({ ...route.query, ...patch })) {
     if (v !== undefined && v !== null && v !== '') query[k] = String(v)
@@ -38,11 +41,25 @@ function setFilter(patch: Partial<Record<keyof Filters, string | number | undefi
   router.replace({ query })
 }
 
+// Grafikte bir noktaya tıklanınca istek listesi o zaman aralığına daralır (diğer bölümler seçili aralıkta kalır)
+const requestWindow = computed(() =>
+  route.query.windowFrom && route.query.windowTo
+    ? { from: route.query.windowFrom as string, to: route.query.windowTo as string }
+    : null)
+const windowLabel = computed(() => {
+  const w = requestWindow.value
+  return w ? `${formatDateTime(w.from)} – ${formatTime(w.to)}` : ''
+})
+
 const thresholds = ref<ThresholdList | null>(null)
 const services = ref<string[]>([])
 const operations = ref<OperationSummary[]>([])
 const totals = ref<OperationSummary | null>(null)
+const previousTotals = ref<OperationSummary | null>(null)
 const buckets = ref<TimeBucket[]>([])
+const previousBuckets = ref<TimeBucket[]>([])
+const histogram = ref<Histogram | null>(null)
+const outcomes = ref<Outcome | null>(null)
 const requests = ref<PagedResult<RequestRow> | null>(null)
 const error = ref<string | null>(null)
 const loading = ref(false)
@@ -105,18 +122,28 @@ async function loadAll() {
   const f = filters.value
   try {
     // Tablo seçili operasyondan bağımsız tüm operasyonları gösterir; geri kalanlar filtreye uyar.
-    const [svc, ops, tot, ts, thr] = await Promise.all([
+    // Karşılaştırma için aynı filtre bir önceki eşit uzunluktaki dönemde de sorgulanır.
+    const previous = { ...f, ...previousWindow(f.range) }
+    const [svc, ops, tot, ts, thr, prevTot, prevTs, hist, out] = await Promise.all([
       api.services(props.app),
       api.summary(props.app, { ...f, operation: undefined }),
       api.totals(props.app, f),
       api.timeseries(props.app, f),
-      api.thresholds()
+      api.thresholds(),
+      api.totals(props.app, previous),
+      api.timeseries(props.app, previous),
+      api.histogram(props.app, f),
+      api.outcomes(props.app, f)
     ])
     thresholds.value = thr
     services.value = svc
     operations.value = ops
     totals.value = tot
     buckets.value = ts
+    previousTotals.value = prevTot
+    previousBuckets.value = shiftBuckets(prevTs, rangeMs(f.range))
+    histogram.value = hist
+    outcomes.value = out
     await loadRequests()
     lastLoaded.value = new Date()
   } catch (e) {
@@ -129,8 +156,13 @@ async function loadAll() {
 async function loadRequests() {
   requests.value = await api.requests(
     props.app,
-    { ...filters.value, onlySlow: onlySlow.value, onlyErrors: onlyErrors.value },
+    { ...filters.value, ...requestWindow.value, onlySlow: onlySlow.value, onlyErrors: onlyErrors.value },
     sort.value, PAGE_SIZE, offset.value)
+}
+
+function onChartSelect(w: { from: string; to: string }) {
+  setFilter({ windowFrom: w.from, windowTo: w.to })
+  scrollToSection('istekler')
 }
 
 function selectOperation(row: OperationSummary) {
@@ -201,15 +233,32 @@ onUnmounted(() => window.clearInterval(timer))
 
   <div v-if="error" class="error-box">{{ error }}</div>
 
-  <StatTiles :totals="totals" :threshold-ms="thresholdMs" :app="app" @go="onTile" />
+  <StatTiles :totals="totals" :threshold-ms="thresholdMs" :app="app" :previous="previousTotals" @go="onTile" />
 
   <section id="grafik" class="card section">
     <div class="card-header">
       <h2>Yanıt süresi</h2>
-      <span class="muted small">{{ filters.operation ?? 'Tüm operasyonlar' }}</span>
+      <span class="muted small">{{ filters.operation ?? 'Tüm operasyonlar' }} · kesikli: önceki {{ rangeLabel(filters.range) }}</span>
     </div>
-    <LatencyChart :buckets="buckets" :threshold-ms="thresholdMs" />
+    <LatencyChart :buckets="buckets" :threshold-ms="thresholdMs" :previous="previousBuckets" drillable @select="onChartSelect" />
   </section>
+
+  <div class="pair section">
+    <section class="card">
+      <div class="card-header">
+        <h2>Süre dağılımı</h2>
+        <span class="muted small">kaç {{ app === 'service' ? 'istek' : 'çalışma' }} hangi sürede</span>
+      </div>
+      <DurationHistogram :data="histogram" :threshold-ms="thresholdMs" />
+    </section>
+    <section class="card">
+      <div class="card-header">
+        <h2>Sonuçlar</h2>
+        <span class="muted small">{{ app === 'service' ? 'durum kodları ve hata türleri' : 'başarılı / başarısız ve hata türleri' }}</span>
+      </div>
+      <OutcomeBreakdown :data="outcomes" :app="app" />
+    </section>
+  </div>
 
   <section class="card section">
     <div class="card-header">
@@ -227,6 +276,10 @@ onUnmounted(() => window.clearInterval(timer))
         <span v-if="requests" class="muted count">{{ formatInt(requests.total) }}</span>
       </h2>
       <div class="list-controls">
+        <span v-if="requestWindow" class="window-chip">
+          Grafikten seçilen: {{ windowLabel }}
+          <button type="button" aria-label="Zaman aralığı seçimini kaldır" @click="setFilter({ windowFrom: undefined, windowTo: undefined })">✕</button>
+        </span>
         <label><input v-model="onlySlow" type="checkbox" /> Sadece eşiği aşanlar</label>
         <label><input v-model="onlyErrors" type="checkbox" /> Sadece hatalılar</label>
         <select v-model="sort" aria-label="Sıralama">
@@ -281,6 +334,17 @@ onUnmounted(() => window.clearInterval(timer))
 .min-dur { display: flex; align-items: center; gap: 6px; color: var(--text-secondary); }
 .min-dur input { width: 80px; }
 .detail-link { font-size: 13px; }
+.window-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 4px 2px 10px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  font-size: 12.5px;
+}
+.window-chip button { border: none; background: none; cursor: pointer; padding: 0 6px; color: var(--text-secondary); font-size: 12px; }
+.window-chip button:hover { color: var(--text-primary); }
 .section { margin-top: 16px; }
 .small { font-size: 12px; }
 .count { font-weight: 400; font-size: 13px; margin-left: 6px; }

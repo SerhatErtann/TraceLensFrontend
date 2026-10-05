@@ -2,8 +2,8 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api, type Overview, type RankedOperation, type ServiceCard } from '../api'
-import { formatDateTime, formatInt, formatMs, formatPercent } from '../format'
-import { RANGES, rangeLabel } from '../ranges'
+import { compare, formatDateTime, formatInt, formatMs, formatPercent } from '../format'
+import { RANGES, rangeLabel, rangeMs, shiftBuckets } from '../ranges'
 import KpiTile from '../components/KpiTile.vue'
 import LatencyChart from '../components/LatencyChart.vue'
 import TrendSpark from '../components/TrendSpark.vue'
@@ -94,6 +94,14 @@ function openRequests(options: { sort?: 'time'; only?: 'slow' | 'errors' }) {
   router.push({ path: '/services', query: { range: range.value, ...options }, hash: '#istekler' })
 }
 
+// Önceki dönemin grafiği seçili döneme kaydırılıp kesikli çizilir
+const previousTimeline = computed(() => (data.value ? shiftBuckets(data.value.previousTimeline, rangeMs(range.value)) : []))
+
+// Grafikte bir noktaya tıklanınca o aralığın istekleri Servisler sayfasında listelenir
+function openWindow(w: { from: string; to: string }) {
+  router.push({ path: '/services', query: { range: range.value, windowFrom: w.from, windowTo: w.to }, hash: '#istekler' })
+}
+
 function scrollTo(id: string) {
   const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
   document.getElementById(id)?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' })
@@ -131,12 +139,16 @@ onUnmounted(() => window.clearInterval(timer))
                hint="Uygulamaları gör" @go="scrollTo('servisler')" />
       <KpiTile label="Toplam istek" :value="formatInt(data.totals.requestCount)"
                :sub="`saniyede ort. ${data.totals.requestsPerSecond.toLocaleString('tr-TR')}`" hint="İstekleri listele"
+               :delta="compare(data.totals.requestCount, data.previousTotals.requestCount, formatInt(data.previousTotals.requestCount), null)"
                @go="openRequests({ sort: 'time' })" />
       <KpiTile label="Ortalama süre" :value="formatMs(data.totals.avgMs)" :sub="`p95 ${formatMs(data.totals.p95Ms)}`"
+               :delta="compare(data.totals.avgMs, data.previousTotals.avgMs, formatMs(data.previousTotals.avgMs), true)"
                hint="Süre grafiğini aç" @go="router.push({ path: '/services', query: { range }, hash: '#grafik' })" />
       <KpiTile label="Eşiği aşan" :value="formatInt(data.totals.slowCount)" :sub="`oran ${formatPercent(data.totals.slowRate)}`"
+               :delta="compare(data.totals.slowRate, data.previousTotals.slowRate, `oran ${formatPercent(data.previousTotals.slowRate)}`, true)"
                hint="Eşiği aşanları listele" @go="openRequests({ only: 'slow' })" />
       <KpiTile label="Hatalı" :value="formatInt(data.totals.errorCount)" :sub="`oran ${formatPercent(data.totals.errorRate)}`"
+               :delta="compare(data.totals.errorRate, data.previousTotals.errorRate, `oran ${formatPercent(data.previousTotals.errorRate)}`, true)"
                :bad="data.totals.errorRate >= 0.05" hint="Hatalıları listele" @go="openRequests({ only: 'errors' })" />
       <KpiTile label="Açık alarm" :value="formatInt(data.totals.activeAlertCount)"
                :sub="data.totals.activeAlertCount ? 'müdahale bekliyor' : 'her şey normal'"
@@ -193,7 +205,8 @@ onUnmounted(() => window.clearInterval(timer))
         <h2>Yanıt süresi · tüm uygulamalar</h2>
         <RouterLink :to="{ path: '/services', query: { range } }" class="small">Servis bazında incele →</RouterLink>
       </div>
-      <LatencyChart :buckets="data.timeline" :threshold-ms="data.timelineThresholdMs" />
+      <LatencyChart :buckets="data.timeline" :threshold-ms="data.timelineThresholdMs" :previous="previousTimeline"
+                    drillable @select="openWindow" />
     </section>
 
     <div class="pair section">
@@ -287,8 +300,6 @@ onUnmounted(() => window.clearInterval(timer))
 .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
 .section { margin-top: 16px; scroll-margin-top: 16px; }
 .hidden-note { display: block; padding: 0 16px 14px; }
-.pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; }
-.pair > .card { min-width: 0; }
 .tiny { font-size: 11.5px; }
 .nowrap { white-space: nowrap; }
 .op-cell { min-width: 0; max-width: 0; width: 60%; }

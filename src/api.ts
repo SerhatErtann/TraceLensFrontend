@@ -4,6 +4,9 @@ export type AppKind = 'service' | 'scheduler'
 
 export interface Filters {
   range: string
+  /** Verilirse range yerine bu aralık kullanılır (ISO). Önceki dönem karşılaştırması ve grafikten detaya inme için. */
+  from?: string
+  to?: string
   service?: string
   operation?: string
   minDurationMs?: number
@@ -30,7 +33,10 @@ export interface TimeBucket {
   time: string
   count: number
   avgMs: number
+  p50Ms: number
+  p90Ms: number
   p95Ms: number
+  p99Ms: number
   slowCount: number
   errorCount: number
 }
@@ -189,6 +195,60 @@ export interface RecentError {
   error: string
 }
 
+export interface PeriodTotals {
+  from: string
+  to: string
+  requestCount: number
+  avgMs: number
+  p95Ms: number
+  errorCount: number
+  errorRate: number
+  slowCount: number
+  slowRate: number
+}
+
+export interface Histogram {
+  count: number
+  p50Ms: number
+  p90Ms: number
+  p99Ms: number
+  /** Logaritmik aralıklar; ilk ve son dolu aralık arası boşluksuz. Son aralıkta toMs null. */
+  buckets: { fromMs: number; toMs: number | null; count: number; errorCount: number }[]
+}
+
+export interface Outcome {
+  count: number
+  /** "200", "502"...; görevlerde "succeeded" / "failed" */
+  statuses: { status: string; count: number; errorCount: number }[]
+  errorTypes: { type: string; count: number; exampleMessage: string | null; topOperation: string; lastTraceId: string; lastSeen: string }[]
+}
+
+export interface Instance {
+  instanceId: string
+  host: string | null
+  count: number
+  avgMs: number
+  p95Ms: number
+  slowCount: number
+  errorCount: number
+  errorRate: number
+  firstSeen: string
+  lastSeen: string
+}
+
+export interface Anatomy {
+  operation: string
+  sampleCount: number
+  avgDurationMs: number
+  timeSplit: TimeSplit[]
+  steps: { category: SpanCategory; name: string; target: string; callsPerRequest: number; msPerRequest: number; avgMs: number; share: number }[]
+}
+
+export interface ServiceMap {
+  nodes: { id: string; name: string; kind: 'service' | 'scheduler' | 'database' | 'external'; count: number; avgMs: number; errorRate: number; status: 'ok' | 'slow' | 'error' }[]
+  edges: { from: string; to: string; count: number; avgMs: number; p95Ms: number; errorCount: number; errorRate: number }[]
+}
+
 export interface Overview {
   totals: {
     serviceCount: number
@@ -204,6 +264,9 @@ export interface Overview {
     openIssueCount: number
     activeAlertCount: number
   }
+  /** Bir önceki eşit uzunluktaki dönem */
+  previousTotals: PeriodTotals
+  previousTimeline: TimeBucket[]
   services: ServiceCard[]
   timeline: TimeBucket[]
   timelineThresholdMs: number
@@ -330,7 +393,15 @@ export const api = {
   timeseries: (app: AppKind, f: Filters) => get<TimeBucket[]>(`/${app}/timeseries`, filterParams(f)),
   requests: (app: AppKind, f: Filters, sort: 'time' | 'duration', limit: number, offset: number) =>
     get<PagedResult<RequestRow>>(`/${app}/requests`, { ...filterParams(f), sort, limit, offset }),
+  // Dağılımlar (ortak filtrelerle)
+  histogram: (app: AppKind, f: Filters) => get<Histogram>(`/${app}/histogram`, filterParams(f)),
+  outcomes: (app: AppKind, f: Filters) => get<Outcome>(`/${app}/outcomes`, filterParams(f)),
+  instances: (app: AppKind, f: Filters) => get<Instance[]>(`/${app}/instances`, filterParams(f)),
+  serviceMap: (range: string) => get<ServiceMap>('/service-map', { range }),
+
   // Servis Detayı
+  anatomy: (app: AppKind, service: string, operation: string, range: string) =>
+    get<Anatomy>(`/${app}/services/${encodeURIComponent(service)}/anatomy`, { range, operation }),
   breakdown: (app: AppKind, service: string, range: string) =>
     get<ServiceBreakdown>(`/${app}/services/${encodeURIComponent(service)}/breakdown`, { range }),
   /** Bir grubun en yavaş çağrıları; operation alanı çağrının yapıldığı istektir (endpoint/görev) */

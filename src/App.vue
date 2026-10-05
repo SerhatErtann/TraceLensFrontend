@@ -59,6 +59,7 @@ onUnmounted(() => window.clearInterval(timer))
         Sorunlar
         <span v-if="openIssues" class="badge" :aria-label="`${openIssues} açık sorun`">{{ openIssues }}</span>
       </RouterLink>
+      <RouterLink to="/map" class="nav-item">Servis haritası</RouterLink>
       <div class="sep" role="separator" />
       <!-- Detay sayfası (/services/order-service) ayrı bir route; menüde yine Servisler/Görevler seçili görünsün -->
       <RouterLink to="/services" class="nav-item" :class="{ 'router-link-active': route.path.startsWith('/services/') }">Servisler</RouterLink>
