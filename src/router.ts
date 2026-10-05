@@ -5,6 +5,7 @@ import IssuesView from './views/IssuesView.vue'
 import OverviewView from './views/OverviewView.vue'
 import ServiceDetailView from './views/ServiceDetailView.vue'
 import ServiceMapView from './views/ServiceMapView.vue'
+import LiveView from './views/LiveView.vue'
 import TraceView from './views/TraceView.vue'
 import AlertsView from './views/AlertsView.vue'
 import SettingsView from './views/SettingsView.vue'
@@ -19,6 +20,7 @@ export const router = createRouter({
     { path: '/login', component: LoginView, meta: { public: true } },
     { path: '/overview', component: HomeView },
     { path: '/issues', component: IssuesView },
+    { path: '/live', component: LiveView },
     { path: '/map', component: ServiceMapView },
     { path: '/services', component: OverviewView, props: { app: 'service' } },
     { path: '/schedulers', component: OverviewView, props: { app: 'scheduler' } },

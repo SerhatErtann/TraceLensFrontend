@@ -249,6 +249,43 @@ export interface ServiceMap {
   edges: { from: string; to: string; count: number; avgMs: number; p95Ms: number; errorCount: number; errorRate: number }[]
 }
 
+export interface LiveRow extends RequestRow {
+  app: 'Service' | 'Scheduler'
+}
+
+export interface LiveStats {
+  windowSeconds: number
+  /** Veri servislerden toplu geldiği için pencere bu kadar saniye geriden biter */
+  lagSeconds: number
+  windowEnd: string
+  count: number
+  requestsPerSecond: number
+  avgMs: number
+  p95Ms: number
+  slowCount: number
+  errorCount: number
+  topErrorService: string | null
+  topErrorServiceCount: number
+  /** Saniye başına, eskiden yeniye (windowSeconds eleman) */
+  seconds: { time: string; count: number; slowCount: number; errorCount: number }[]
+}
+
+export interface Live {
+  /** Sonraki sorguda since olarak gönderilir */
+  cursor: string | null
+  /** En yeni üstte; önceki sorgularla çakışabilir (spanId ile ayıklanır) */
+  items: LiveRow[]
+  stats: LiveStats
+}
+
+export interface LiveParams {
+  since?: string | null
+  app?: AppKind
+  service?: string
+  onlySlow?: boolean
+  onlyErrors?: boolean
+}
+
 export interface Overview {
   totals: {
     serviceCount: number
@@ -398,6 +435,7 @@ export const api = {
   outcomes: (app: AppKind, f: Filters) => get<Outcome>(`/${app}/outcomes`, filterParams(f)),
   instances: (app: AppKind, f: Filters) => get<Instance[]>(`/${app}/instances`, filterParams(f)),
   serviceMap: (range: string) => get<ServiceMap>('/service-map', { range }),
+  live: (params: LiveParams) => get<Live>('/live', { ...params }),
 
   // Servis Detayı
   anatomy: (app: AppKind, service: string, operation: string, range: string) =>

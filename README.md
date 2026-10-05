@@ -22,6 +22,7 @@ Durdurmak için terminalde Ctrl+C.
 |---|---|---|
 | Genel Bakış | `/overview` | Girişte açılan sayfa. Tıklanabilir özet kutuları (uygulama, istek, süre, eşiği aşan, hatalı, alarm); Servisler ve Görevler kartları (her bölümde en fazla 5, fazlası için "Tümünü gör"): durum, eşik çizgili süre grafiği, ortalama/p95/hata, en yavaş endpoint. Altta tüm uygulamaların süre grafiği, en yavaş / en çok hata veren 5 ve son hatalar |
 | Sorunlar | `/issues` | Sadece ortalaması eşiği aşanlar ve hata oranı %5'i geçenler, nedeniyle (en sık hata dahil). Filtre: alarm açık / yavaş / hatalı / servis. Satıra tıklayınca en kötü örneğin trace'i açılır |
+| Canlı | `/live` | Şu an gelen istekler ve görev çalışmaları: 2 sn'de bir sadece yeniler gelir, en yeni üstte (en fazla 100), yeni satır kısa süre parlar (eşiği aşan/hatalı kırmızı-turuncu). Son 1 dk özeti (istek/sn, ortalama, eşiği aşan, hatalı), son 60 sn çubukları, Duraklat/Devam et (bekleyen sayısıyla), uygulama ve "sadece eşiği aşanlar / hatalılar" filtreleri. Veri birkaç saniye gecikmeli |
 | Servis haritası | `/map` | Kim kimi çağırıyor: görevler → servisler → veritabanları; oklarda çağrı sayısı, ortalama süre, hata oranı. Altta bağlantı tablosu |
 | Servisler | `/services` | Gelen HTTP istekleri: özet kutuları (önceki döneme göre değişim), süre grafiği (ortalama ve seçilebilir p50/p90/p95/p99, önceki dönem kesikli, altta istek/hata çubukları; noktaya tıklayınca o aralığın istekleri), süre dağılımı histogramı, durum kodları ve hata türleri, endpoint tablosu (eşik ✎ ile yerinde düzenlenir), istek listesi (hatalı satırlar kırmızı, eşiği aşanlar turuncu şeritli) |
 | Görevler | `/schedulers` | Aynı ekran, zamanlanmış görev (scheduler) çalışmaları için |
@@ -44,7 +45,7 @@ src/
 ├─ router.ts
 ├─ styles.css        Renk token'ları (açık/koyu tema)
 ├─ ranges.ts         Ortak zaman aralığı seçenekleri
-├─ views/            HomeView (Genel Bakış), IssuesView (Sorunlar), OverviewView (Services + Schedulers), ServiceDetailView, ServiceMapView,
+├─ views/            HomeView (Genel Bakış), IssuesView (Sorunlar), OverviewView (Services + Schedulers), ServiceDetailView, ServiceMapView, LiveView,
 │                    TraceView, AlertsView, SettingsView, LoginView
 └─ components/       KpiTile, TrendSpark, LatencyChart, OperationsTable, SpanGroupsTable, RequestsTable, StatTiles, DurationHistogram,
                      OutcomeBreakdown, InstancesTable, RequestAnatomy, TimeSplitBar,

@@ -4,7 +4,15 @@ import type { RequestRow } from '../api'
 import { formatBytes, formatDateTime, formatMs } from '../format'
 import StatusBadge from './StatusBadge.vue'
 
-const props = defineProps<{ rows: RequestRow[]; app: 'service' | 'scheduler'; thresholdFor: (row: RequestRow) => number }>()
+const props = defineProps<{
+  rows: RequestRow[]
+  app: 'service' | 'scheduler'
+  thresholdFor: (row: RequestRow) => number
+  /** Canlı sayfada yeni gelen satırlar (spanId); kısa süre parlar */
+  freshIds?: Set<string>
+  /** İkinci sütunun başlığı; varsayılan servis/uygulama */
+  serviceLabel?: string
+}>()
 
 // Resmi OpenTelemetry paketleri yanıt boyutunu kaydetmez; hiçbir satırda yoksa boş sütun gösterilmez.
 const showSize = computed(() => props.app === 'service' && props.rows.some(r => r.responseBytes != null))
@@ -13,7 +21,11 @@ const isError = (row: RequestRow) => row.status === 'Error'
 const isSlow = (row: RequestRow) => row.durationMs > props.thresholdFor(row)
 
 // Hatalı satır tamamen kırmızı zeminli; hatasız ama eşiği aşan satırda turuncu şerit
-const rowClass = (row: RequestRow) => ({ 'row-error': isError(row), 'row-slow': !isError(row) && isSlow(row) })
+const rowClass = (row: RequestRow) => ({
+  'row-error': isError(row),
+  'row-slow': !isError(row) && isSlow(row),
+  'row-fresh': props.freshIds?.has(row.spanId) ?? false
+})
 
 function status(row: RequestRow) {
   if (row.status === 'Error') {
@@ -33,7 +45,7 @@ function status(row: RequestRow) {
       <thead>
         <tr>
           <th>Zaman</th>
-          <th>{{ app === 'service' ? 'Servis' : 'Uygulama' }}</th>
+          <th>{{ serviceLabel ?? (app === 'service' ? 'Servis' : 'Uygulama') }}</th>
           <th>Operasyon</th>
           <th class="num">Süre</th>
           <th>Sonuç</th>
@@ -76,6 +88,15 @@ tr.row-error:hover td { background: color-mix(in srgb, var(--status-critical-sof
 tr.row-error .secondary, tr.row-error .muted { color: var(--text-primary); }
 /* Hatasız ama eşiği aşan: solda turuncu şerit */
 tr.row-slow td:first-child { box-shadow: inset 4px 0 0 var(--status-serious); }
+
+/* Canlı: yeni gelen satır kısa süre mavi parlar; eşiği aşan/hatalıysa kırmızı/turuncu parlar, sonra normal görünümüne döner */
+@keyframes fresh { from { background: var(--accent-soft); } to { background: transparent; } }
+@keyframes fresh-slow { from { background: var(--status-warning-soft); } to { background: transparent; } }
+@keyframes fresh-error { from { background: color-mix(in srgb, var(--status-critical) 30%, var(--status-critical-soft)); } to { background: var(--status-critical-soft); } }
+tr.row-fresh td { animation: fresh 1.6s ease-out; }
+tr.row-fresh.row-slow td { animation: fresh-slow 2.5s ease-out; }
+tr.row-fresh.row-error td { animation: fresh-error 2.5s ease-out; }
+@media (prefers-reduced-motion: reduce) { tr.row-fresh td { animation: none !important; } }
 
 .legend { display: flex; gap: 16px; padding: 0 16px 8px; font-size: 12px; color: var(--text-secondary); }
 .legend span { display: inline-flex; align-items: center; gap: 6px; }

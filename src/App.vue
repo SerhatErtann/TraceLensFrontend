@@ -59,6 +59,7 @@ onUnmounted(() => window.clearInterval(timer))
         Sorunlar
         <span v-if="openIssues" class="badge" :aria-label="`${openIssues} açık sorun`">{{ openIssues }}</span>
       </RouterLink>
+      <RouterLink to="/live" class="nav-item">Canlı <span class="live-dot" aria-hidden="true" /></RouterLink>
       <RouterLink to="/map" class="nav-item">Servis haritası</RouterLink>
       <div class="sep" role="separator" />
       <!-- Detay sayfası (/services/order-service) ayrı bir route; menüde yine Servisler/Görevler seçili görünsün -->
@@ -142,6 +143,13 @@ onUnmounted(() => window.clearInterval(timer))
   font-weight: 600;
   padding: 0 7px;
   line-height: 18px;
+}
+.live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--status-good);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--status-good) 20%, transparent);
 }
 .content {
   padding: 24px 28px 48px;
