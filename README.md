@@ -12,6 +12,7 @@ npm run dev
 ```
 
 http://localhost:5180 adresini açın. Geliştirmede `/api` istekleri Vite proxy'si ile `http://localhost:5100`'e gider (bkz. `vite.config.ts`).
+Başka bir API'ye bağlanmak için `TRACELENS_API_URL` ortam değişkenini verin, ikinci bir kopya için `npm run dev -- --port 5181`.
 
 Durdurmak için terminalde Ctrl+C.
 
@@ -19,6 +20,8 @@ Durdurmak için terminalde Ctrl+C.
 
 | Sayfa | Yol | İçerik |
 |---|---|---|
+| Genel Bakış | `/overview` | Girişte açılan sayfa. Tıklanabilir özet kutuları (servis, istek, süre, hata, açık sorun) ve servis/scheduler kartları: durum, eşik çizgili süre grafiği, ortalama/p95/hata. Karta tıklayınca o servisin sayfası açılır |
+| Sorunlar | `/issues` | Sadece ortalaması eşiği aşanlar ve hata oranı %5'i geçenler, nedeniyle (en sık hata dahil). Filtre: alarm açık / yavaş / hatalı / servis. Satıra tıklayınca en kötü örneğin trace'i açılır |
 | Services | `/services` | Gelen HTTP istekleri: KPI kartları, ortalama/p95 grafiği (eşik çizgisiyle), endpoint tablosu (eşik ✎ ile yerinde düzenlenir), istek listesi |
 | Schedulers | `/schedulers` | Aynı ekran, job çalıştırmaları için |
 | Trace detayı | `/traces/:traceId` | Waterfall (servis renkleri, kendi süresi, aç/kapa), "Nereye bakmalı?" ipuçları, attribute'lar, exception stack trace |
@@ -38,8 +41,11 @@ src/
 ├─ format.ts         ms / byte / tarih biçimlendirme
 ├─ router.ts
 ├─ styles.css        Renk token'ları (açık/koyu tema)
-├─ views/            OverviewView (Services + Schedulers), TraceView, AlertsView, SettingsView
-└─ components/       LatencyChart, OperationsTable, RequestsTable, StatTiles, StatusBadge, ThresholdCell, Waterfall
+├─ ranges.ts         Ortak zaman aralığı seçenekleri
+├─ views/            HomeView (Genel Bakış), IssuesView (Sorunlar), OverviewView (Services + Schedulers),
+│                    TraceView, AlertsView, SettingsView, LoginView
+└─ components/       KpiTile, TrendSpark, LatencyChart, OperationsTable, RequestsTable, StatTiles,
+                     StatusBadge, ThresholdCell, Waterfall
 ```
 
 ## Komutlar

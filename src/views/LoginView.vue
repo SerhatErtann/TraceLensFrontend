@@ -17,7 +17,7 @@ async function submit() {
   error.value = null
   try {
     Object.assign(auth, await api.login(username.value, password.value), { loaded: true })
-    const redirect = typeof route.query.redirect === 'string' && route.query.redirect.startsWith('/') ? route.query.redirect : '/services'
+    const redirect = typeof route.query.redirect === 'string' && route.query.redirect.startsWith('/') ? route.query.redirect : '/overview'
     router.replace(redirect)
   } catch (e) {
     error.value = (e as Error).message

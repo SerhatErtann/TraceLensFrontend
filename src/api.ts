@@ -149,6 +149,59 @@ interface DataResponse<T> extends BaseResponse {
   data: T
 }
 
+export interface ServiceCard {
+  service: string
+  app: 'Service' | 'Scheduler'
+  status: 'ok' | 'slow' | 'error'
+  count: number
+  avgMs: number
+  p95Ms: number
+  errorCount: number
+  errorRate: number
+  slowOperationCount: number
+  thresholdMs: number
+  /** Eşit aralıklı ortalama süreler; null = o aralıkta istek yok */
+  trend: (number | null)[]
+}
+
+export interface Overview {
+  totals: {
+    serviceCount: number
+    schedulerCount: number
+    requestCount: number
+    requestsPerSecond: number
+    avgMs: number
+    p95Ms: number
+    errorCount: number
+    errorRate: number
+    openIssueCount: number
+    activeAlertCount: number
+  }
+  services: ServiceCard[]
+  from: string
+  to: string
+  trendBucketSeconds: number
+}
+
+export interface Issue {
+  app: 'Service' | 'Scheduler'
+  service: string
+  operation: string
+  kind: 'error' | 'slow'
+  isSlow: boolean
+  hasErrors: boolean
+  count: number
+  avgMs: number
+  p95Ms: number
+  thresholdMs: number
+  errorCount: number
+  errorRate: number
+  topError: string | null
+  alarmActive: boolean
+  alarmSince: string | null
+  lastSeen: string
+}
+
 export interface AuthStatus {
   authEnabled: boolean
   authenticated: boolean
@@ -194,6 +247,8 @@ const send = async <T>(method: 'POST' | 'PUT' | 'DELETE', path: string, body?: u
 const filterParams = (f: Filters): Params => ({ ...f })
 
 export const api = {
+  overview: (range: string) => get<Overview>('/overview', { range }),
+  issues: (range: string, service?: string) => get<Issue[]>('/issues', { range, service }),
   services: (app: AppKind) => get<string[]>(`/${app}/services`),
   summary: (app: AppKind, f: Filters) => get<OperationSummary[]>(`/${app}/summary`, filterParams(f)),
   totals: (app: AppKind, f: Filters) => get<OperationSummary>(`/${app}/totals`, filterParams(f)),

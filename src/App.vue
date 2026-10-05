@@ -9,15 +9,19 @@ const router = useRouter()
 const isLoginPage = computed(() => route.path === '/login')
 
 const activeAlerts = ref(0)
+const openIssues = ref(0)
 let timer: number | undefined
 
 async function refreshAlerts() {
   // Oturum durumu öğrenilmeden istek atılmaz; aksi halde 401 erken yönlendirmeye yol açar.
   if (!auth.loaded || isLoginPage.value || (auth.authEnabled && !auth.authenticated)) return
   try {
-    activeAlerts.value = (await api.alerts()).active.length
+    // Rozetler, sayfaların varsayılan aralığıyla (son 1 saat) aynı sayıyı gösterir
+    const [alerts, issues] = await Promise.all([api.alerts(), api.issues('1h')])
+    activeAlerts.value = alerts.active.length
+    openIssues.value = issues.length
   } catch {
-    // Menü rozeti kritik değil; API kapalıysa sessizce geç.
+    // Menü rozetleri kritik değil; API kapalıysa sessizce geç.
   }
 }
 
@@ -25,6 +29,7 @@ async function logout() {
   await api.logout().catch(() => {})
   markLoggedOut()
   activeAlerts.value = 0
+  openIssues.value = 0
   router.replace('/login')
 }
 
@@ -49,6 +54,12 @@ onUnmounted(() => window.clearInterval(timer))
         </svg>
         TraceLens
       </div>
+      <RouterLink to="/overview" class="nav-item">Genel Bakış</RouterLink>
+      <RouterLink to="/issues" class="nav-item">
+        Sorunlar
+        <span v-if="openIssues" class="badge" :aria-label="`${openIssues} açık sorun`">{{ openIssues }}</span>
+      </RouterLink>
+      <div class="sep" role="separator" />
       <RouterLink to="/services" class="nav-item">Services</RouterLink>
       <RouterLink to="/schedulers" class="nav-item">Schedulers</RouterLink>
       <RouterLink to="/alerts" class="nav-item">
@@ -104,6 +115,8 @@ onUnmounted(() => window.clearInterval(timer))
 }
 .nav-item:hover { background: var(--surface-2); text-decoration: none; }
 .nav-item.router-link-active { background: var(--accent-soft); color: var(--text-primary); }
+.sep { height: 1px; background: var(--border); margin: 8px 6px; }
+@media (max-width: 760px) { .sep { display: none; } }
 .user {
   margin-top: auto;
   display: flex;

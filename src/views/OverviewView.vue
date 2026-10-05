@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api, thresholdKey, type AppKind, type Filters, type OperationSummary, type PagedResult, type RequestRow,
   type ThresholdList, type TimeBucket } from '../api'
@@ -126,8 +126,13 @@ watch([sort, onlySlow, onlyErrors], () => { offset.value = 0; loadRequests() })
 watch(offset, loadRequests)
 
 let timer: number | undefined
-onMounted(() => {
-  loadAll()
+onMounted(async () => {
+  await loadAll()
+  // Genel Bakış'tan #grafik / #istekler ile gelindiyse veri yüklendikten sonra o bölüme kaydır
+  if (route.hash) {
+    await nextTick()
+    document.querySelector(route.hash)?.scrollIntoView({ block: 'start' })
+  }
   timer = window.setInterval(() => { if (autoRefresh.value && !loading.value) loadAll() }, 30_000)
 })
 onUnmounted(() => window.clearInterval(timer))
@@ -176,7 +181,7 @@ onUnmounted(() => window.clearInterval(timer))
 
   <StatTiles :totals="totals" :threshold-ms="thresholdMs" />
 
-  <section class="card section">
+  <section id="grafik" class="card section">
     <div class="card-header">
       <h2>Yanıt süresi</h2>
       <span class="muted small">{{ filters.operation ?? 'Tüm operasyonlar' }}</span>
@@ -194,7 +199,7 @@ onUnmounted(() => window.clearInterval(timer))
                      @select="selectOperation" @threshold-changed="loadAll" />
   </section>
 
-  <section class="card section">
+  <section id="istekler" class="card section">
     <div class="card-header">
       <h2>{{ app === 'service' ? 'İstekler' : 'Çalışmalar' }}
         <span v-if="requests" class="muted count">{{ formatInt(requests.total) }}</span>
