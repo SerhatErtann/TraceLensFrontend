@@ -46,3 +46,17 @@ src/
 | `npm run dev` | Geliştirme sunucusu (5180) |
 | `npm run typecheck` | TypeScript kontrolü |
 | `npm run build` | Prod derlemesi (`dist/`) |
+
+## Docker
+
+Sunucu kurulumu **tracelens-service** reposundaki `docker compose --profile app up -d --build` ile yapılır; bu repo oradan derlenir (iki repo yan yana klonlanmalı). Tek başına çalıştırmak için:
+
+```
+docker build -t tracelens-dashboard .
+docker run -p 8080:8080 -e TRACELENS_API_URL=http://<api-adresi>:8080 tracelens-dashboard
+```
+
+Image, dashboard'u derleyip **nginx** ile sunar (`nginx/default.conf.template`):
+- `/api/*` istekleri `TRACELENS_API_URL` adresindeki TraceLensService'e yönlendirilir.
+- `/services`, `/traces/...` gibi adresler doğrudan açıldığında da sayfa bulunur.
+- nginx root olmayan kullanıcıyla 8080'de çalışır.
