@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { api, type AppKind, type Filters, type OperationSummary, type PagedResult, type RequestRow,
-  type Settings, type TimeBucket } from '../api'
+import { api, thresholdKey, type AppKind, type Filters, type OperationSummary, type PagedResult, type RequestRow,
+  type ThresholdList, type TimeBucket } from '../api'
 import { formatInt } from '../format'
 import StatTiles from '../components/StatTiles.vue'
 import LatencyChart from '../components/LatencyChart.vue'
@@ -38,7 +38,7 @@ function setFilter(patch: Partial<Record<keyof Filters, string | number | undefi
   router.replace({ query })
 }
 
-const settings = ref<Settings | null>(null)
+const thresholds = ref<ThresholdList | null>(null)
 const services = ref<string[]>([])
 const operations = ref<OperationSummary[]>([])
 const totals = ref<OperationSummary | null>(null)
@@ -66,15 +66,19 @@ const operationOptions = computed(() =>
     .map(o => o.operation))].sort()
 )
 
+const defaultThresholdMs = computed(() => thresholds.value?.defaultMs ?? 200)
+const customThresholds = computed(() =>
+  new Set((thresholds.value?.overrides ?? []).map(o => thresholdKey(o.service, o.operation))))
+
 const thresholdMs = computed(() => {
   const selected = operations.value.find(o =>
     o.operation === filters.value.operation && (!filters.value.service || o.service === filters.value.service))
-  return selected?.thresholdMs ?? settings.value?.defaultThresholdMs ?? 200
+  return selected?.thresholdMs ?? defaultThresholdMs.value
 })
 
 function thresholdFor(row: RequestRow) {
   return operations.value.find(o => o.service === row.service && o.operation === row.operation)?.thresholdMs
-    ?? settings.value?.defaultThresholdMs ?? 200
+    ?? defaultThresholdMs.value
 }
 
 async function loadAll() {
@@ -83,12 +87,14 @@ async function loadAll() {
   const f = filters.value
   try {
     // Tablo seçili operasyondan bağımsız tüm operasyonları gösterir; geri kalanlar filtreye uyar.
-    const [svc, ops, tot, ts] = await Promise.all([
+    const [svc, ops, tot, ts, thr] = await Promise.all([
       api.services(props.app),
       api.summary(props.app, { ...f, operation: undefined }),
       api.totals(props.app, f),
-      api.timeseries(props.app, f)
+      api.timeseries(props.app, f),
+      api.thresholds()
     ])
+    thresholds.value = thr
     services.value = svc
     operations.value = ops
     totals.value = tot
@@ -120,8 +126,7 @@ watch([sort, onlySlow, onlyErrors], () => { offset.value = 0; loadRequests() })
 watch(offset, loadRequests)
 
 let timer: number | undefined
-onMounted(async () => {
-  settings.value = await api.settings().catch(() => null)
+onMounted(() => {
   loadAll()
   timer = window.setInterval(() => { if (autoRefresh.value && !loading.value) loadAll() }, 30_000)
 })
@@ -182,9 +187,11 @@ onUnmounted(() => window.clearInterval(timer))
   <section class="card section">
     <div class="card-header">
       <h2>{{ app === 'service' ? "Endpoint'ler" : "Job'lar" }}</h2>
-      <span class="muted small">Satıra tıklayınca grafik ve istek listesi o operasyona göre filtrelenir</span>
+      <span class="muted small">Satıra tıklayınca grafik ve istek listesi o operasyona göre filtrelenir · eşiği değiştirmek için ✎</span>
     </div>
-    <OperationsTable :rows="operations" :selected="filters.operation" :app="app" @select="selectOperation" />
+    <OperationsTable :rows="operations" :selected="filters.operation" :app="app"
+                     :custom-thresholds="customThresholds" :default-threshold-ms="defaultThresholdMs"
+                     @select="selectOperation" @threshold-changed="loadAll" />
   </section>
 
   <section class="card section">

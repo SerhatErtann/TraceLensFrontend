@@ -36,6 +36,7 @@ onUnmounted(() => window.clearInterval(timer))
         Alarmlar
         <span v-if="activeAlerts" class="badge" :aria-label="`${activeAlerts} aktif alarm`">{{ activeAlerts }}</span>
       </RouterLink>
+      <RouterLink to="/settings" class="nav-item">Ayarlar</RouterLink>
     </nav>
     <main class="content">
       <RouterView />

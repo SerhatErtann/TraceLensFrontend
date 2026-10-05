@@ -19,10 +19,11 @@ Durdurmak için terminalde Ctrl+C.
 
 | Sayfa | Yol | İçerik |
 |---|---|---|
-| Services | `/services` | Gelen HTTP istekleri: KPI kartları, ortalama/p95 grafiği (eşik çizgisiyle), endpoint tablosu, istek listesi |
+| Services | `/services` | Gelen HTTP istekleri: KPI kartları, ortalama/p95 grafiği (eşik çizgisiyle), endpoint tablosu (eşik ✎ ile yerinde düzenlenir), istek listesi |
 | Schedulers | `/schedulers` | Aynı ekran, job çalıştırmaları için |
 | Trace detayı | `/traces/:traceId` | Waterfall (servis renkleri, kendi süresi, aç/kapa), "Nereye bakmalı?" ipuçları, attribute'lar, exception stack trace |
 | Alarmlar | `/alerts` | Açık ve kapanan alarmlar, test bildirimi butonu |
+| Ayarlar | `/settings` | Varsayılan eşik, özel eşiklerin listesi (düzenle/kaldır), alarm ayarlarının özeti |
 
 Filtreler URL'de tutulur; bir görünümün linkini kopyalayıp paylaşabilirsiniz.
 
@@ -34,8 +35,8 @@ src/
 ├─ format.ts         ms / byte / tarih biçimlendirme
 ├─ router.ts
 ├─ styles.css        Renk token'ları (açık/koyu tema)
-├─ views/            OverviewView (Services + Schedulers), TraceView, AlertsView
-└─ components/       LatencyChart, OperationsTable, RequestsTable, StatTiles, StatusBadge, Waterfall
+├─ views/            OverviewView (Services + Schedulers), TraceView, AlertsView, SettingsView
+└─ components/       LatencyChart, OperationsTable, RequestsTable, StatTiles, StatusBadge, ThresholdCell, Waterfall
 ```
 
 ## Komutlar

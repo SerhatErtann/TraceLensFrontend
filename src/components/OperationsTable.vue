@@ -1,11 +1,19 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import type { OperationSummary } from '../api'
+import { thresholdKey, type OperationSummary } from '../api'
 import { formatInt, formatMs, formatPercent, relativeTime } from '../format'
 import StatusBadge from './StatusBadge.vue'
+import ThresholdCell from './ThresholdCell.vue'
 
-const props = defineProps<{ rows: OperationSummary[]; selected?: string; app: 'service' | 'scheduler' }>()
-const emit = defineEmits<{ select: [row: OperationSummary] }>()
+const props = defineProps<{
+  rows: OperationSummary[]
+  selected?: string
+  app: 'service' | 'scheduler'
+  /** Özel eşik tanımlı operasyonların anahtarları ("servis|operasyon"). */
+  customThresholds: Set<string>
+  defaultThresholdMs: number
+}>()
+const emit = defineEmits<{ select: [row: OperationSummary]; thresholdChanged: [] }>()
 
 type SortKey = 'operation' | 'count' | 'avgMs' | 'p95Ms' | 'maxMs' | 'slowCount' | 'errorCount'
 const sortKey = ref<SortKey>('avgMs')
@@ -80,7 +88,11 @@ const rowKey = (r: OperationSummary) => `${r.service}|${r.operation}`
             {{ formatInt(row.errorCount) }}
             <span class="muted pct">{{ formatPercent(row.errorRate) }}</span>
           </td>
-          <td class="num muted">{{ formatMs(row.thresholdMs) }}</td>
+          <td class="num">
+            <ThresholdCell :service="row.service" :operation="row.operation" :threshold-ms="row.thresholdMs"
+                           :is-custom="customThresholds.has(thresholdKey(row.service, row.operation))"
+                           :default-ms="defaultThresholdMs" @changed="emit('thresholdChanged')" />
+          </td>
           <td class="muted nowrap">{{ relativeTime(row.lastSeen) }}</td>
         </tr>
       </tbody>

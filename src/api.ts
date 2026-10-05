@@ -124,6 +124,21 @@ export interface Settings {
   notificationFormat: string
 }
 
+export interface ThresholdOverride {
+  service: string
+  operation: string
+  thresholdMs: number
+  updatedAt: string
+}
+
+export interface ThresholdList {
+  defaultMs: number
+  overrides: ThresholdOverride[]
+}
+
+/** Özel eşik anahtarı; backend'deki "servis|operasyon" biçimiyle aynı. */
+export const thresholdKey = (service: string, operation: string) => `${service}|${operation}`
+
 // Backend tüm yanıtları CommonUtils sözleşmesiyle döner: { isSuccess, message, messageCode, data }.
 interface BaseResponse {
   isSuccess: boolean
@@ -154,6 +169,13 @@ async function request<R extends BaseResponse>(path: string, init?: RequestInit,
 
 const get = async <T>(path: string, params: Params = {}) => (await request<DataResponse<T>>(path, undefined, params)).data
 
+const send = async <T>(method: 'PUT' | 'DELETE', path: string, body?: unknown, params: Params = {}) =>
+  (await request<DataResponse<T>>(path, {
+    method,
+    headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body)
+  }, params)).data
+
 const filterParams = (f: Filters): Params => ({ ...f })
 
 export const api = {
@@ -167,5 +189,13 @@ export const api = {
   alerts: (days = 7) => get<{ active: Alert[]; history: Alert[] }>('/alerts', { days }),
   settings: () => get<Settings>('/settings'),
   /** Başarılıysa backend'in mesajını döner; başarısızsa Error fırlatır (mesajı hatanın nedeni). */
-  testNotification: async () => (await request<BaseResponse>('/alerts/test-notification', { method: 'POST' })).message
+  testNotification: async () => (await request<BaseResponse>('/alerts/test-notification', { method: 'POST' })).message,
+
+  // Eşikler: her işlem güncel listenin tamamını döner
+  thresholds: () => get<ThresholdList>('/thresholds'),
+  setDefaultThreshold: (thresholdMs: number) => send<ThresholdList>('PUT', '/thresholds/default', { thresholdMs }),
+  setThreshold: (service: string, operation: string, thresholdMs: number) =>
+    send<ThresholdList>('PUT', '/thresholds', { service, operation, thresholdMs }),
+  deleteThreshold: (service: string, operation: string) =>
+    send<ThresholdList>('DELETE', '/thresholds', undefined, { service, operation })
 }
