@@ -4,7 +4,11 @@ import { useRoute, useRouter } from 'vue-router'
 import { api, thresholdKey, type AppKind, type Filters, type Histogram, type OperationSummary, type Outcome, type PagedResult,
   type RequestRow, type ThresholdList, type TimeBucket } from '../api'
 import { formatDateTime, formatInt, formatTime } from '../format'
-import { previousWindow, rangeLabel, rangeMs, shiftBuckets } from '../ranges'
+import { shiftBuckets } from '../ranges'
+import { useTimeRange } from '../timeRange'
+import { listInsights } from '../insights'
+import RangePicker from '../components/RangePicker.vue'
+import InsightList from '../components/InsightList.vue'
 import StatTiles, { type TileAction } from '../components/StatTiles.vue'
 import LatencyChart from '../components/LatencyChart.vue'
 import DurationHistogram from '../components/DurationHistogram.vue'
@@ -16,18 +20,14 @@ const props = defineProps<{ app: AppKind }>()
 const route = useRoute()
 const router = useRouter()
 
-const RANGES = [
-  { value: '15m', label: '15 dk' },
-  { value: '1h', label: '1 sa' },
-  { value: '6h', label: '6 sa' },
-  { value: '24h', label: '24 sa' },
-  { value: '7d', label: '7 gün' }
-]
 const PAGE_SIZE = 25
+
+// Zaman aralığı: hazır aralık ya da özel tarih/saat (RangePicker)
+const time = useTimeRange()
 
 // Filtreler URL'de tutulur: link paylaşılınca aynı görünüm açılır.
 const filters = computed<Filters>(() => ({
-  range: (route.query.range as string) || '1h',
+  ...time.win.value,
   service: (route.query.service as string) || undefined,
   operation: (route.query.operation as string) || undefined,
   minDurationMs: route.query.minDurationMs ? Number(route.query.minDurationMs) : undefined
@@ -102,6 +102,20 @@ const defaultThresholdMs = computed(() => thresholds.value?.defaultMs ?? 200)
 const customThresholds = computed(() =>
   new Set((thresholds.value?.overrides ?? []).map(o => thresholdKey(o.service, o.operation))))
 
+// "Kısaca" kutusu: trafik ve hız, süre dağılımı, eşiğini aşanlar, hatalar — düz cümleyle
+const insights = computed(() => listInsights({
+  label: time.phrase.value,
+  noun: props.app === 'service' ? 'istek' : 'çalışma',
+  opNoun: props.app === 'service' ? 'endpoint' : 'görev',
+  totals: totals.value,
+  previous: previousTotals.value,
+  operations: operations.value,
+  outcome: outcomes.value,
+  histogram: histogram.value,
+  thresholdMs: thresholdMs.value,
+  opLink: o => ({ path: route.path, query: { ...route.query, service: o.service, operation: o.operation }, hash: '#grafik' })
+}))
+
 const thresholdMs = computed(() => {
   const selected = operations.value.find(o =>
     o.operation === filters.value.operation && (!filters.value.service || o.service === filters.value.service))
@@ -123,7 +137,7 @@ async function loadAll() {
   try {
     // Tablo seçili operasyondan bağımsız tüm operasyonları gösterir; geri kalanlar filtreye uyar.
     // Karşılaştırma için aynı filtre bir önceki eşit uzunluktaki dönemde de sorgulanır.
-    const previous = { ...f, ...previousWindow(f.range) }
+    const previous = { ...f, ...time.previous() }
     const [svc, ops, tot, ts, thr, prevTot, prevTs, hist, out] = await Promise.all([
       api.services(props.app),
       api.summary(props.app, { ...f, operation: undefined }),
@@ -141,7 +155,7 @@ async function loadAll() {
     totals.value = tot
     buckets.value = ts
     previousTotals.value = prevTot
-    previousBuckets.value = shiftBuckets(prevTs, rangeMs(f.range))
+    previousBuckets.value = shiftBuckets(prevTs, time.durationMs.value)
     histogram.value = hist
     outcomes.value = out
     await loadRequests()
@@ -201,10 +215,7 @@ onUnmounted(() => window.clearInterval(timer))
   </header>
 
   <div class="filters">
-    <div class="segmented" role="group" aria-label="Zaman aralığı">
-      <button v-for="r in RANGES" :key="r.value" :class="{ active: filters.range === r.value }"
-              @click="setFilter({ range: r.value })">{{ r.label }}</button>
-    </div>
+    <RangePicker />
     <select :value="filters.service ?? ''" :aria-label="app === 'service' ? 'Servis' : 'Uygulama'"
             @change="setFilter({ service: ($event.target as HTMLSelectElement).value, operation: undefined })">
       <option value="">Tüm {{ app === 'service' ? 'servisler' : 'uygulamalar' }}</option>
@@ -226,19 +237,21 @@ onUnmounted(() => window.clearInterval(timer))
       Filtreleri temizle
     </button>
     <RouterLink v-if="filters.service" class="detail-link"
-                :to="{ path: `/${app === 'service' ? 'services' : 'schedulers'}/${encodeURIComponent(filters.service)}`, query: { range: filters.range } }">
+                :to="{ path: `/${app === 'service' ? 'services' : 'schedulers'}/${encodeURIComponent(filters.service)}`, query: time.query.value }">
       {{ filters.service }} detayı →
     </RouterLink>
   </div>
 
   <div v-if="error" class="error-box">{{ error }}</div>
 
+  <InsightList :items="insights" />
+
   <StatTiles :totals="totals" :threshold-ms="thresholdMs" :app="app" :previous="previousTotals" @go="onTile" />
 
   <section id="grafik" class="card section">
     <div class="card-header">
       <h2>Yanıt süresi</h2>
-      <span class="muted small">{{ filters.operation ?? 'Tüm operasyonlar' }} · kesikli: önceki {{ rangeLabel(filters.range) }}</span>
+      <span class="muted small">{{ filters.operation ?? 'Tüm operasyonlar' }} · kesikli çizgi: önceki dönem</span>
     </div>
     <LatencyChart :buckets="buckets" :threshold-ms="thresholdMs" :previous="previousBuckets" drillable @select="onChartSelect" />
   </section>
@@ -249,7 +262,7 @@ onUnmounted(() => window.clearInterval(timer))
         <h2>Süre dağılımı</h2>
         <span class="muted small">kaç {{ app === 'service' ? 'istek' : 'çalışma' }} hangi sürede</span>
       </div>
-      <DurationHistogram :data="histogram" :threshold-ms="thresholdMs" />
+      <DurationHistogram :data="histogram" :threshold-ms="thresholdMs" :single-operation="!!filters.operation" />
     </section>
     <section class="card">
       <div class="card-header">
@@ -314,22 +327,6 @@ onUnmounted(() => window.clearInterval(timer))
   gap: 10px;
   margin-bottom: 16px;
 }
-.segmented {
-  display: inline-flex;
-  border: 1px solid var(--border-strong);
-  border-radius: 6px;
-  overflow: hidden;
-  background: var(--surface-1);
-}
-.segmented button {
-  border: none;
-  background: transparent;
-  padding: 5px 12px;
-  cursor: pointer;
-  border-right: 1px solid var(--border);
-}
-.segmented button:last-child { border-right: none; }
-.segmented button.active { background: var(--accent); color: #fff; }
 .op-select { max-width: 320px; }
 .min-dur { display: flex; align-items: center; gap: 6px; color: var(--text-secondary); }
 .min-dur input { width: 80px; }

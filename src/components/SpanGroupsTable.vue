@@ -14,13 +14,13 @@ const sortDesc = ref(true)
 
 const nameLabel: Record<SpanCategory, string> = { method: 'Metod', db: 'Sorgu', call: 'Çağrı' }
 
-const columns = computed<{ key: SortKey; label: string; numeric: boolean }[]>(() => [
+const columns = computed<{ key: SortKey; label: string; numeric: boolean; title?: string }[]>(() => [
   { key: 'name', label: nameLabel[props.category], numeric: false },
   { key: 'count', label: 'Çağrılma', numeric: true },
-  { key: 'callsPerRequest', label: 'İstek başına', numeric: true },
+  { key: 'callsPerRequest', label: 'İstek başına', numeric: true, title: 'Servise gelen bir istekte ortalama kaç kez çalışıyor' },
   { key: 'avgMs', label: 'Ortalama', numeric: true },
-  { key: 'p95Ms', label: 'p95', numeric: true },
-  { key: 'maxMs', label: 'Max', numeric: true },
+  { key: 'p95Ms', label: 'p95', numeric: true, title: 'Çalışmaların yüzde 95 i bu süreden kısa; en yavaş yüzde 5 bunun üstünde' },
+  { key: 'maxMs', label: 'Max', numeric: true, title: 'Bu aralıktaki en uzun çalışma' },
   { key: 'errorCount', label: 'Hata', numeric: true }
 ])
 
@@ -64,7 +64,7 @@ const emptyText: Record<SpanCategory, string> = {
       <thead>
         <tr>
           <th>Durum</th>
-          <th v-for="c in columns" :key="c.key" class="sortable" :class="{ num: c.numeric }" @click="sortBy(c.key)"
+          <th v-for="c in columns" :key="c.key" class="sortable" :class="{ num: c.numeric }" :title="c.title" @click="sortBy(c.key)"
               :aria-sort="sortKey === c.key ? (sortDesc ? 'descending' : 'ascending') : 'none'">
             {{ c.label }}<span v-if="sortKey === c.key" class="arrow">{{ sortDesc ? '↓' : '↑' }}</span>
           </th>

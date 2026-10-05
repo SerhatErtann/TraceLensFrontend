@@ -2,12 +2,19 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import type { Histogram } from '../api'
 import { formatInt, formatMs, formatPercent } from '../format'
+import { bimodal } from '../insights'
 
 /**
  * Süre dağılımı: kaç istek hangi süre aralığında. Ortalamanın gizlediğini gösterir; iki tepe varsa
  * "çoğu hızlı ama bir grup çok yavaş" demektir. Eşiğin üstündeki aralıklar turuncu, hatalı kısım kırmızı.
  */
-const props = defineProps<{ data: Histogram | null; thresholdMs: number }>()
+const props = defineProps<{
+  data: Histogram | null
+  thresholdMs: number
+  /** Tek bir endpoint/görev seçiliyse iki küme "aynı işin iki yolu" demektir; değilse farklı endpoint'ler */
+  singleOperation?: boolean
+}>()
+const groups = computed(() => bimodal(props.data))
 
 const HEIGHT = 200
 const PAD = { top: 30, bottom: 26, left: 8, right: 8 }
@@ -90,12 +97,17 @@ function onMove(event: MouseEvent) {
 <template>
   <div ref="root" class="histogram">
     <div v-if="data && data.count" class="summary">
-      <span>p50 <b>{{ formatMs(data.p50Ms) }}</b></span>
-      <span>p90 <b>{{ formatMs(data.p90Ms) }}</b></span>
-      <span>p99 <b>{{ formatMs(data.p99Ms) }}</b></span>
-      <span>eşik ({{ formatMs(thresholdMs) }}) üstü:
-        <b :class="{ over: overThreshold > 0 }">{{ thresholdOnEdge ? '' : '≈' }}{{ formatPercent(overThreshold / (total || 1)) }}</b>
-      </span>
+      <p>
+        Yarısı <b>{{ formatMs(data.p50Ms) }}</b> içinde bitiyor · onda dokuzu <b>{{ formatMs(data.p90Ms) }}</b> içinde ·
+        en yavaş yüzde birlik dilim <b>{{ formatMs(data.p99Ms) }}</b> ve üstü ·
+        eşiği ({{ formatMs(thresholdMs) }}) aşanların payı <b :class="{ over: overThreshold > 0 }">{{ thresholdOnEdge ? '' : '≈' }}{{ formatPercent(overThreshold / (total || 1)) }}</b>
+      </p>
+      <p v-if="groups" class="groups">
+        İstekler iki ayrı grupta toplanıyor: <b>{{ formatPercent(1 - groups.slowShare) }}</b> kadarı {{ shortMs(groups.fast[0]) }}–{{ shortMs(groups.fast[1] ?? 0) }},
+        <b>{{ formatPercent(groups.slowShare) }}</b> kadarı {{ shortMs(groups.slow[0]) }}{{ groups.slow[1] ? `–${shortMs(groups.slow[1])}` : ' ve üstü' }} arasında.
+        <template v-if="singleOperation">Aynı endpoint'in bazı istekleri farklı ve daha yavaş bir yoldan geçiyor olabilir; yavaş gruptaki istekleri incelemek gerekir.</template>
+        <template v-else>Bu genelde farklı hızda çalışan endpoint'lerden gelir; tek bir endpoint seçince o endpoint'in kendi dağılımı görünür.</template>
+      </p>
     </div>
 
     <div v-if="!data" class="empty">Yükleniyor…</div>
@@ -131,6 +143,10 @@ function onMove(event: MouseEvent) {
       <div class="tt-row muted">Hatalı <b>{{ formatInt(hovered.errorCount) }}</b></div>
     </div>
 
+    <p v-if="data && data.count" class="how">
+      Nasıl okunur: her çubuk bir süre aralığı (solda hızlı, sağda yavaş); yüksekliği o aralıktaki istek sayısı.
+      Turuncu çubuklar eşiğin üstünde; kesikli çizgiler isteklerin yarısının (p50), onda dokuzunun (p90) ve yüzde doksan dokuzunun (p99) bittiği süre.
+    </p>
     <div v-if="data && data.count" class="legend">
       <span><i class="sw" />Eşik altı</span>
       <span><i class="sw over" />Eşik üstü</span>
@@ -143,9 +159,12 @@ function onMove(event: MouseEvent) {
 
 <style scoped>
 .histogram { position: relative; padding: 0 16px 14px; }
-.summary { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 12.5px; color: var(--text-secondary); }
+.summary { font-size: 13px; color: var(--text-secondary); display: flex; flex-direction: column; gap: 6px; }
+.summary p { margin: 0; }
 .summary b { color: var(--text-primary); font-variant-numeric: tabular-nums; }
 .summary b.over { color: var(--status-critical); }
+.groups { padding: 6px 10px; border-radius: 6px; background: var(--status-warning-soft); color: var(--text-primary); }
+.how { margin: 6px 0 0; font-size: 12px; color: var(--text-muted); }
 svg { display: block; max-width: 100%; height: auto; }
 .base { stroke: var(--border-strong); stroke-width: 1; }
 .hit { fill: transparent; }

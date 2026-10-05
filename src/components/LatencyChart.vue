@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import type { TimeBucket } from '../api'
-import { formatInt, formatMs, formatTime, parseUtc } from '../format'
+import { formatInt, formatMs, formatPercent, formatTime, parseUtc } from '../format'
 
 /**
  * Yanıt süresi grafiği. Üstte süre çizgileri (ortalama ve seçilebilir p50/p90/p95/p99, eşik, önceki dönem),
@@ -197,6 +197,41 @@ const tooltipLeft = computed(() => {
   return x > width.value - 210 ? x - 198 : x + 12
 })
 
+// Grafiğin altındaki düz cümleler: en yavaş an, eşiğin üstünde kalınan süre, en yoğun an, önceki dönemle fark
+const daily = computed(() => bucketMs.value >= 86_400_000)
+const when = (p: { time: string }) =>
+  daily.value ? parseUtc(p.time).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', weekday: 'short' }) : formatTime(p.time).slice(0, 5)
+
+const facts = computed(() => {
+  const pts = points.value.filter(p => p.count > 0)
+  if (!pts.length) return []
+  const list: string[] = []
+  const peak = pts.reduce((a, b) => (b.avgMs > a.avgMs ? b : a))
+  list.push(`En yavaş ${daily.value ? 'gün' : 'an'}: ${when(peak)} — ortalama ${formatMs(peak.avgMs)}.`)
+  const over = pts.filter(p => p.avgMs > props.thresholdMs).length
+  list.push(over === 0
+    ? 'Ortalama hiç eşiği aşmadı.'
+    : over === pts.length ? 'Ortalama baştan sona eşiğin üstündeydi.'
+    : `Ortalama, ${daily.value ? 'günlerin' : 'sürenin'} ${formatPercent(over / pts.length)} kadarında eşiğin üstündeydi.`)
+  const busiest = pts.reduce((a, b) => (b.count > a.count ? b : a))
+  list.push(`En yoğun ${daily.value ? 'gün' : 'an'}: ${when(busiest)} — ${formatInt(busiest.count)} istek${busiest.errorCount ? `, ${formatInt(busiest.errorCount)} hatalı` : ''}.`)
+  if (previousShown.value) {
+    const avg = (list: TimeBucket[]) => {
+      const n = list.reduce((s, p) => s + p.count, 0)
+      return n ? list.reduce((s, p) => s + p.avgMs * p.count, 0) / n : 0
+    }
+    const prev = avg(previousPoints.value)
+    const cur = avg(pts)
+    if (prev) {
+      const change = (cur - prev) / prev
+      list.push(Math.abs(change) < 0.05
+        ? 'Önceki dönemle (kesikli çizgi) ortalama hemen hemen aynı.'
+        : `Önceki döneme (kesikli çizgi) göre ortalama %${Math.round(Math.abs(change) * 100)} daha ${change > 0 ? 'yavaş' : 'hızlı'}.`)
+    }
+  }
+  return list
+})
+
 function onClick() {
   if (!props.drillable || !hovered.value) return
   const from = hovered.value.t
@@ -280,6 +315,14 @@ function onClick() {
       <div class="tt-row muted">Hatalı <b>{{ formatInt(hovered.errorCount) }}</b></div>
       <div v-if="drillable" class="tt-hint">Tıkla: bu aralığın istekleri →</div>
     </div>
+
+    <div v-if="buckets.length" class="notes">
+      <p class="how">
+        Nasıl okunur: çizgiler isteklerin ne kadar sürdüğünü, alttaki çubuklar {{ daily ? 'o gün' : 'o anda' }} kaç istek geldiğini gösterir.
+        Kesikli yatay çizgi eşik: çizgi onun üstündeyse istekler yavaş.
+      </p>
+      <p class="facts">{{ facts.join(' ') }}</p>
+    </div>
   </div>
 </template>
 
@@ -338,4 +381,8 @@ svg.drillable { cursor: pointer; }
 .tt-row { display: flex; align-items: center; gap: 6px; }
 .tt-row b { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--text-primary); }
 .tt-hint { margin-top: 4px; color: var(--accent); font-size: 11.5px; }
+.notes { padding: 4px 8px 6px; display: flex; flex-direction: column; gap: 4px; }
+.notes p { margin: 0; }
+.how { font-size: 12px; color: var(--text-muted); }
+.facts { font-size: 13px; color: var(--text-secondary); }
 </style>

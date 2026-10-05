@@ -3,14 +3,16 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api, type Issue } from '../api'
 import { formatInt, formatMs, formatPercent, relativeTime } from '../format'
-import { RANGES } from '../ranges'
+import { useTimeRange } from '../timeRange'
+import RangePicker from '../components/RangePicker.vue'
 
 type Filter = 'all' | 'alarm' | 'slow' | 'error'
 
 const route = useRoute()
 const router = useRouter()
 
-const range = computed(() => (route.query.range as string) || '1h')
+// Zaman aralığı: hazır aralık ya da özel tarih/saat (RangePicker)
+const time = useTimeRange()
 const filter = computed<Filter>(() => (['alarm', 'slow', 'error'].includes(route.query.filter as string) ? route.query.filter : 'all') as Filter)
 const service = computed(() => (route.query.service as string) || undefined)
 
@@ -38,7 +40,7 @@ const FILTERS: { value: Filter; label: string }[] = [
 async function load() {
   loading.value = true
   try {
-    issues.value = await api.issues(range.value, service.value)
+    issues.value = await api.issues(time.win.value, service.value)
     error.value = null
   } catch (e) {
     error.value = `Sorunlar alınamadı: ${(e as Error).message}`
@@ -74,7 +76,7 @@ async function openExample(i: Issue) {
   opening.value = keyOf(i)
   try {
     const app = i.app === 'Service' ? 'service' : 'scheduler'
-    const page = await api.requests(app, { range: range.value, service: i.service, operation: i.operation, onlyErrors: i.kind === 'error' }, 'duration', 1, 0)
+    const page = await api.requests(app, { ...time.win.value, service: i.service, operation: i.operation, onlyErrors: i.kind === 'error' }, 'duration', 1, 0)
     const traceId = page.items[0]?.traceId
     if (traceId) router.push(`/traces/${traceId}`)
     else error.value = 'Bu sorun için örnek istek bulunamadı.'
@@ -87,10 +89,10 @@ async function openExample(i: Issue) {
 
 const operationLink = (i: Issue) => ({
   path: i.app === 'Service' ? '/services' : '/schedulers',
-  query: { range: range.value, service: i.service, operation: i.operation }
+  query: { ...time.query.value, service: i.service, operation: i.operation }
 })
 
-watch([range, service], load)
+watch(() => [JSON.stringify(time.win.value), service.value], load)
 let timer: number | undefined
 onMounted(() => {
   load()
@@ -105,9 +107,7 @@ onUnmounted(() => window.clearInterval(timer))
       <h1>Sorunlar</h1>
       <p class="muted sub">Sadece dikkat isteyenler: ortalaması eşiği aşanlar ve hata oranı %5'i geçenler, en kötüden başlayarak. Satıra tıklayınca en kötü örneği açılır.</p>
     </div>
-    <div class="segmented" role="group" aria-label="Zaman aralığı">
-      <button v-for="r in RANGES" :key="r.value" :class="{ active: range === r.value }" @click="setQuery({ range: r.value })">{{ r.label }}</button>
-    </div>
+    <RangePicker />
   </header>
 
   <div class="chips">
@@ -153,10 +153,6 @@ onUnmounted(() => window.clearInterval(timer))
 <style scoped>
 .page-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
 .sub { margin: 2px 0 0; max-width: 720px; }
-.segmented { display: inline-flex; border: 1px solid var(--border-strong); border-radius: 6px; overflow: hidden; background: var(--surface-1); }
-.segmented button { border: none; background: transparent; padding: 5px 12px; cursor: pointer; border-right: 1px solid var(--border); }
-.segmented button:last-child { border-right: none; }
-.segmented button.active { background: var(--accent); color: #fff; }
 .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
 .chip { border: 1px solid var(--border-strong); background: var(--surface-1); border-radius: 999px; padding: 3px 12px; cursor: pointer; font-size: 13px; }
 .chip[aria-pressed='true'] { background: var(--text-primary); color: var(--surface-1); border-color: var(--text-primary); }

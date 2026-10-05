@@ -1,4 +1,5 @@
 // TraceLensService sözleşmesi. Backend'deki Models/Responses sınıflarıyla birebir eşleşir.
+import type { TimeWindow } from './timeRange'
 
 export type AppKind = 'service' | 'scheduler'
 
@@ -249,6 +250,62 @@ export interface ServiceMap {
   edges: { from: string; to: string; count: number; avgMs: number; p95Ms: number; errorCount: number; errorRate: number }[]
 }
 
+export type ReportPeriod = 'today' | 'yesterday' | '7d' | '30d' | 'custom'
+
+export interface ReportTotals {
+  requestCount: number
+  avgMs: number
+  p50Ms: number
+  p95Ms: number
+  errorCount: number
+  errorRate: number
+  /** Yaklaşık (süre dağılımı aralıklarından) */
+  slowCount: number
+  slowRate: number
+  dayCount: number
+}
+
+export interface ReportOperation {
+  app: 'Service' | 'Scheduler'
+  service: string
+  operation: string
+  thresholdMs: number
+  count: number
+  avgMs: number
+  p95Ms: number
+  slowCount: number
+  errorCount: number
+  errorRate: number
+  previousCount: number | null
+  previousAvgMs: number | null
+  previousErrorRate: number | null
+}
+
+export interface Report {
+  period: ReportPeriod
+  includesToday: boolean
+  timeZone: string
+  /** yyyy-MM-dd (rapor saat dilimindeki günler, ikisi dahil) */
+  from: string
+  to: string
+  previousFrom: string
+  previousTo: string
+  fromUtc: string
+  toUtc: string
+  previousFromUtc: string
+  dataSince: string | null
+  totals: ReportTotals
+  previousTotals: ReportTotals
+  daily: TimeBucket[]
+  previousDaily: TimeBucket[]
+  operations: ReportOperation[]
+  alerts: {
+    count: number
+    totalMinutes: number
+    longest: { app: 'Service' | 'Scheduler'; service: string; operation: string; peakValueMs: number; thresholdMs: number; firedAt: string; resolvedAt: string | null; minutes: number }[]
+  }
+}
+
 export interface LiveRow extends RequestRow {
   app: 'Service' | 'Scheduler'
 }
@@ -422,8 +479,8 @@ const send = async <T>(method: 'POST' | 'PUT' | 'DELETE', path: string, body?: u
 const filterParams = (f: Filters): Params => ({ ...f })
 
 export const api = {
-  overview: (range: string) => get<Overview>('/overview', { range }),
-  issues: (range: string, service?: string) => get<Issue[]>('/issues', { range, service }),
+  overview: (w: TimeWindow) => get<Overview>('/overview', { ...w }),
+  issues: (w: TimeWindow, service?: string) => get<Issue[]>('/issues', { ...w, service }),
   services: (app: AppKind) => get<string[]>(`/${app}/services`),
   summary: (app: AppKind, f: Filters) => get<OperationSummary[]>(`/${app}/summary`, filterParams(f)),
   totals: (app: AppKind, f: Filters) => get<OperationSummary>(`/${app}/totals`, filterParams(f)),
@@ -434,18 +491,19 @@ export const api = {
   histogram: (app: AppKind, f: Filters) => get<Histogram>(`/${app}/histogram`, filterParams(f)),
   outcomes: (app: AppKind, f: Filters) => get<Outcome>(`/${app}/outcomes`, filterParams(f)),
   instances: (app: AppKind, f: Filters) => get<Instance[]>(`/${app}/instances`, filterParams(f)),
-  serviceMap: (range: string) => get<ServiceMap>('/service-map', { range }),
+  serviceMap: (w: TimeWindow) => get<ServiceMap>('/service-map', { ...w }),
   live: (params: LiveParams) => get<Live>('/live', { ...params }),
+  report: (period: ReportPeriod, from?: string, to?: string) => get<Report>('/reports', { period, from, to }),
 
   // Servis Detayı
-  anatomy: (app: AppKind, service: string, operation: string, range: string) =>
-    get<Anatomy>(`/${app}/services/${encodeURIComponent(service)}/anatomy`, { range, operation }),
-  breakdown: (app: AppKind, service: string, range: string) =>
-    get<ServiceBreakdown>(`/${app}/services/${encodeURIComponent(service)}/breakdown`, { range }),
+  anatomy: (app: AppKind, service: string, operation: string, w: TimeWindow) =>
+    get<Anatomy>(`/${app}/services/${encodeURIComponent(service)}/anatomy`, { ...w, operation }),
+  breakdown: (app: AppKind, service: string, w: TimeWindow) =>
+    get<ServiceBreakdown>(`/${app}/services/${encodeURIComponent(service)}/breakdown`, { ...w }),
   /** Bir grubun en yavaş çağrıları; operation alanı çağrının yapıldığı istektir (endpoint/görev) */
-  spanSamples: (app: AppKind, service: string, group: Pick<SpanGroup, 'category' | 'name' | 'target'>, range: string) =>
+  spanSamples: (app: AppKind, service: string, group: Pick<SpanGroup, 'category' | 'name' | 'target'>, w: TimeWindow) =>
     get<RequestRow[]>(`/${app}/services/${encodeURIComponent(service)}/spans`,
-      { range, category: group.category, name: group.name, target: group.target }),
+      { ...w, category: group.category, name: group.name, target: group.target }),
   trace: (traceId: string) => get<TraceDetail>(`/traces/${encodeURIComponent(traceId)}`),
   alerts: (days = 7) => get<{ active: Alert[]; history: Alert[] }>('/alerts', { days }),
   settings: () => get<Settings>('/settings'),

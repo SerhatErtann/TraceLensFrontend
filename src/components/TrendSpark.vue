@@ -12,6 +12,9 @@ const props = defineProps<{
   from: string
   bucketSeconds: number
   rangeLabel: string
+  /** Özel aralıkta eksenin uçları (varsayılan: "1 sa önce" … "şimdi") */
+  startLabel?: string
+  endLabel?: string
 }>()
 
 const W = 260
@@ -104,7 +107,7 @@ const tooltipLeft = computed(() => (hover.value === null ? 0 : Math.min(78, Math
         {{ hoverTime }} · <b>{{ hoverValue === null ? 'istek yok' : formatMs(hoverValue) }}</b>
       </div>
     </div>
-    <div class="axis"><span>{{ rangeLabel }} önce</span><span>şimdi</span></div>
+    <div class="axis"><span>{{ startLabel ?? `${rangeLabel} önce` }}</span><span>{{ endLabel ?? 'şimdi' }}</span></div>
   </div>
 </template>
 

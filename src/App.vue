@@ -17,7 +17,7 @@ async function refreshAlerts() {
   if (!auth.loaded || isLoginPage.value || (auth.authEnabled && !auth.authenticated)) return
   try {
     // Rozetler, sayfaların varsayılan aralığıyla (son 1 saat) aynı sayıyı gösterir
-    const [alerts, issues] = await Promise.all([api.alerts(), api.issues('1h')])
+    const [alerts, issues] = await Promise.all([api.alerts(), api.issues({ range: '1h' })])
     activeAlerts.value = alerts.active.length
     openIssues.value = issues.length
   } catch {
@@ -61,6 +61,7 @@ onUnmounted(() => window.clearInterval(timer))
       </RouterLink>
       <RouterLink to="/live" class="nav-item">Canlı <span class="live-dot" aria-hidden="true" /></RouterLink>
       <RouterLink to="/map" class="nav-item">Servis haritası</RouterLink>
+      <RouterLink to="/reports" class="nav-item">Raporlar</RouterLink>
       <div class="sep" role="separator" />
       <!-- Detay sayfası (/services/order-service) ayrı bir route; menüde yine Servisler/Görevler seçili görünsün -->
       <RouterLink to="/services" class="nav-item" :class="{ 'router-link-active': route.path.startsWith('/services/') }">Servisler</RouterLink>

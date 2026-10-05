@@ -1,17 +1,21 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { api, type Overview, type RankedOperation, type ServiceCard } from '../api'
 import { compare, formatDateTime, formatInt, formatMs, formatPercent } from '../format'
-import { RANGES, rangeLabel, rangeMs, shiftBuckets } from '../ranges'
+import { shiftBuckets } from '../ranges'
+import { useTimeRange } from '../timeRange'
+import { overviewInsights } from '../insights'
+import RangePicker from '../components/RangePicker.vue'
+import InsightList from '../components/InsightList.vue'
 import KpiTile from '../components/KpiTile.vue'
 import LatencyChart from '../components/LatencyChart.vue'
 import TrendSpark from '../components/TrendSpark.vue'
 
-const route = useRoute()
 const router = useRouter()
 
-const range = computed(() => (route.query.range as string) || '1h')
+// Zaman aralığı adres çubuğunda (hazır aralık ya da özel tarih/saat)
+const { win, isCustom, label, phrase, durationMs, query: rangeQuery } = useTimeRange()
 const data = ref<Overview | null>(null)
 const error = ref<string | null>(null)
 const loading = ref(false)
@@ -62,7 +66,7 @@ const statusLabel: Record<ServiceCard['status'], string> = { ok: 'Normal', slow:
 async function load() {
   loading.value = true
   try {
-    data.value = await api.overview(range.value)
+    data.value = await api.overview(win.value)
     error.value = null
     lastLoaded.value = new Date()
   } catch (e) {
@@ -72,17 +76,15 @@ async function load() {
   }
 }
 
-const setRange = (r: string) => router.replace({ query: { ...route.query, range: r } })
-
 function openService(s: ServiceCard) {
-  router.push({ path: `${s.app === 'Service' ? '/services' : '/schedulers'}/${encodeURIComponent(s.service)}`, query: { range: range.value } })
+  router.push({ path: `${s.app === 'Service' ? '/services' : '/schedulers'}/${encodeURIComponent(s.service)}`, query: rangeQuery.value })
 }
 
 // Listedeki bir endpoint/job'a tıklanınca o operasyona filtrelenmiş sayfa açılır
 function openOperation(o: RankedOperation) {
   router.push({
     path: o.app === 'Service' ? '/services' : '/schedulers',
-    query: { range: range.value, service: o.service, operation: o.operation }
+    query: { ...rangeQuery.value, service: o.service, operation: o.operation }
   })
 }
 
@@ -91,15 +93,18 @@ const thresholdShare = (o: RankedOperation) => Math.min(100, (o.avgMs / o.thresh
 
 // Services sayfasının istek listesine, istenen sıralama/filtreyle ve doğrudan listeye inerek gider
 function openRequests(options: { sort?: 'time'; only?: 'slow' | 'errors' }) {
-  router.push({ path: '/services', query: { range: range.value, ...options }, hash: '#istekler' })
+  router.push({ path: '/services', query: { ...rangeQuery.value, ...options }, hash: '#istekler' })
 }
 
+// "Kısaca" kutusu: tablodaki sayıların düz cümleyle özeti
+const insights = computed(() => (data.value ? overviewInsights(data.value, phrase.value, rangeQuery.value) : []))
+
 // Önceki dönemin grafiği seçili döneme kaydırılıp kesikli çizilir
-const previousTimeline = computed(() => (data.value ? shiftBuckets(data.value.previousTimeline, rangeMs(range.value)) : []))
+const previousTimeline = computed(() => (data.value ? shiftBuckets(data.value.previousTimeline, durationMs.value) : []))
 
 // Grafikte bir noktaya tıklanınca o aralığın istekleri Servisler sayfasında listelenir
 function openWindow(w: { from: string; to: string }) {
-  router.push({ path: '/services', query: { range: range.value, windowFrom: w.from, windowTo: w.to }, hash: '#istekler' })
+  router.push({ path: '/services', query: { ...rangeQuery.value, windowFrom: w.from, windowTo: w.to }, hash: '#istekler' })
 }
 
 function scrollTo(id: string) {
@@ -107,7 +112,7 @@ function scrollTo(id: string) {
   document.getElementById(id)?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' })
 }
 
-watch(range, load)
+watch(win, load)
 let timer: number | undefined
 onMounted(() => {
   load()
@@ -123,9 +128,7 @@ onUnmounted(() => window.clearInterval(timer))
       <p class="muted sub">Tüm servisler ve zamanlanmış görevler. Bir karta tıklayınca o uygulamanın detayı açılır: süre nereye gidiyor, hangi endpoint, metod, sorgu veya çağrı yavaş.</p>
     </div>
     <div class="head-right">
-      <div class="segmented" role="group" aria-label="Zaman aralığı">
-        <button v-for="r in RANGES" :key="r.value" :class="{ active: range === r.value }" @click="setRange(r.value)">{{ r.label }}</button>
-      </div>
+      <RangePicker />
       <span v-if="lastLoaded" class="muted small">{{ lastLoaded.toLocaleTimeString('tr-TR') }}</span>
     </div>
   </header>
@@ -133,6 +136,8 @@ onUnmounted(() => window.clearInterval(timer))
   <div v-if="error" class="error-box">{{ error }}</div>
 
   <template v-if="data">
+    <InsightList :items="insights" />
+
     <div class="tiles">
       <KpiTile label="Uygulama" :value="formatInt(data.totals.serviceCount + data.totals.schedulerCount)"
                :sub="`${data.totals.serviceCount} servis · ${data.totals.schedulerCount} görev`"
@@ -143,7 +148,7 @@ onUnmounted(() => window.clearInterval(timer))
                @go="openRequests({ sort: 'time' })" />
       <KpiTile label="Ortalama süre" :value="formatMs(data.totals.avgMs)" :sub="`p95 ${formatMs(data.totals.p95Ms)}`"
                :delta="compare(data.totals.avgMs, data.previousTotals.avgMs, formatMs(data.previousTotals.avgMs), true)"
-               hint="Süre grafiğini aç" @go="router.push({ path: '/services', query: { range }, hash: '#grafik' })" />
+               hint="Süre grafiğini aç" @go="router.push({ path: '/services', query: rangeQuery, hash: '#grafik' })" />
       <KpiTile label="Eşiği aşan" :value="formatInt(data.totals.slowCount)" :sub="`oran ${formatPercent(data.totals.slowRate)}`"
                :delta="compare(data.totals.slowRate, data.previousTotals.slowRate, `oran ${formatPercent(data.previousTotals.slowRate)}`, true)"
                hint="Eşiği aşanları listele" @go="openRequests({ only: 'slow' })" />
@@ -161,7 +166,7 @@ onUnmounted(() => window.clearInterval(timer))
         <div class="list-controls">
           <label><input v-model="cardFilter[group.id].onlySlow" type="checkbox" /> Sadece eşiği aşanlar</label>
           <label><input v-model="cardFilter[group.id].onlyErrors" type="checkbox" /> Sadece hatalılar</label>
-          <RouterLink :to="{ path: group.path, query: { range } }">Tümünü gör ({{ group.total }}) →</RouterLink>
+          <RouterLink :to="{ path: group.path, query: rangeQuery }">Tümünü gör ({{ group.total }}) →</RouterLink>
         </div>
       </div>
       <div v-if="group.shown.length" class="grid">
@@ -173,7 +178,9 @@ onUnmounted(() => window.clearInterval(timer))
             <span class="status" :class="s.status">{{ statusLabel[s.status] }}</span>
           </span>
           <TrendSpark :values="s.trend" :threshold-ms="s.thresholdMs" :from="data.from"
-                      :bucket-seconds="data.trendBucketSeconds" :range-label="rangeLabel(range)" />
+                      :bucket-seconds="data.trendBucketSeconds" :range-label="label"
+                      :start-label="isCustom ? formatDateTime(win.from!).slice(0, -3) : undefined"
+                      :end-label="isCustom ? formatDateTime(win.to!).slice(0, -3) : undefined" />
           <span class="stats">
             <span><b>{{ formatMs(s.avgMs) }}</b><small>ortalama</small></span>
             <span><b>{{ formatMs(s.p95Ms) }}</b><small>p95</small></span>
@@ -194,7 +201,7 @@ onUnmounted(() => window.clearInterval(timer))
         </button>
       </div>
       <div v-else class="empty">{{ emptyText(group.noun, group.filter) }}</div>
-      <RouterLink v-if="group.hidden" :to="{ path: group.path, query: { range } }" class="hidden-note small">
+      <RouterLink v-if="group.hidden" :to="{ path: group.path, query: rangeQuery }" class="hidden-note small">
         +{{ group.hidden }} {{ group.noun }} daha · Tümünü gör →
       </RouterLink>
     </section>
@@ -203,7 +210,7 @@ onUnmounted(() => window.clearInterval(timer))
     <section id="sure" class="card section">
       <div class="card-header">
         <h2>Yanıt süresi · tüm uygulamalar</h2>
-        <RouterLink :to="{ path: '/services', query: { range } }" class="small">Servis bazında incele →</RouterLink>
+        <RouterLink :to="{ path: '/services', query: rangeQuery }" class="small">Servis bazında incele →</RouterLink>
       </div>
       <LatencyChart :buckets="data.timeline" :threshold-ms="data.timelineThresholdMs" :previous="previousTimeline"
                     drillable @select="openWindow" />
@@ -261,7 +268,7 @@ onUnmounted(() => window.clearInterval(timer))
     <section class="card section">
       <div class="card-header">
         <h2>Son hatalar</h2>
-        <RouterLink :to="{ path: '/services', query: { range, only: 'errors', sort: 'time' }, hash: '#istekler' }" class="small">
+        <RouterLink :to="{ path: '/services', query: { ...rangeQuery, only: 'errors', sort: 'time' }, hash: '#istekler' }" class="small">
           Tüm hatalı istekler →
         </RouterLink>
       </div>
@@ -293,10 +300,6 @@ onUnmounted(() => window.clearInterval(timer))
 .head-right { display: flex; align-items: center; gap: 10px; }
 .small { font-size: 12px; }
 .count { font-weight: 400; font-size: 13px; margin-left: 6px; }
-.segmented { display: inline-flex; border: 1px solid var(--border-strong); border-radius: 6px; overflow: hidden; background: var(--surface-1); }
-.segmented button { border: none; background: transparent; padding: 5px 12px; cursor: pointer; border-right: 1px solid var(--border); }
-.segmented button:last-child { border-right: none; }
-.segmented button.active { background: var(--accent); color: #fff; }
 .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
 .section { margin-top: 16px; scroll-margin-top: 16px; }
 .hidden-note { display: block; padding: 0 16px 14px; }

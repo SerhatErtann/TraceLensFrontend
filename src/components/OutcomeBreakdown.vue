@@ -24,6 +24,23 @@ const statuses = computed(() => {
 
 const errorTotal = computed(() => props.data?.errorTypes.reduce((sum, e) => sum + e.count, 0) ?? 0)
 
+// Tek cümle: "Başarılı: %96,1 · Sunucu hatası (5xx): %3,9"
+const sentence = computed(() => {
+  const d = props.data
+  if (!d || !d.count) return ''
+  const share = (pred: (s: string) => boolean) => d.statuses.filter(s => pred(s.status)).reduce((n, s) => n + s.count, 0) / d.count
+  if (props.app === 'scheduler') {
+    const failed = share(s => s === 'failed')
+    return `Başarılı: ${formatPercent(1 - failed)} · Başarısız: ${formatPercent(failed)}`
+  }
+  const parts = [`Başarılı (2xx–3xx): ${formatPercent(share(s => s[0] === '2' || s[0] === '3'))}`]
+  const client = share(s => s[0] === '4')
+  const server = share(s => s[0] === '5')
+  if (client) parts.push(`istemci hatası (4xx, ör. bulunamadı / yetkisiz): ${formatPercent(client)}`)
+  if (server) parts.push(`sunucu hatası (5xx): ${formatPercent(server)}`)
+  return parts.join(' · ')
+})
+
 // "System.Net.Http.HttpRequestException" → ad "HttpRequestException", altında ad alanı
 function splitType(type: string) {
   const i = type.lastIndexOf('.')
@@ -36,6 +53,7 @@ function splitType(type: string) {
   <div v-else-if="!data.count" class="empty">Bu aralıkta veri yok</div>
   <template v-else>
     <div class="statuses">
+      <p class="sentence">{{ sentence }}</p>
       <div class="bar" role="img" :aria-label="statuses.map(s => `${s.label} ${formatPercent(s.share)}`).join(', ')">
         <i v-for="s in statuses" :key="s.status" :style="{ width: `${s.share * 100}%`, background: s.color }" :title="`${s.label}: ${formatInt(s.count)}`" />
       </div>
@@ -77,11 +95,16 @@ function splitType(type: string) {
       </table>
       <div v-else class="empty">Bu aralıkta hatalı {{ app === 'service' ? 'istek' : 'çalışma' }} yok</div>
     </div>
+    <p v-if="data.errorTypes.length" class="how">
+      Hata türü: hatanın tipi (exception adı) ya da HTTP kodu. Satıra tıklayınca o hatanın son örneği adım adım açılır.
+    </p>
   </template>
 </template>
 
 <style scoped>
 .statuses { padding: 0 16px 12px; }
+.sentence { margin: 0 0 8px; font-size: 13px; color: var(--text-secondary); }
+.how { margin: 0; padding: 8px 16px 12px; font-size: 12px; color: var(--text-muted); }
 .bar { display: flex; height: 14px; border-radius: 4px; overflow: hidden; gap: 2px; }
 .bar i { display: block; height: 100%; min-width: 3px; }
 .legend { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 8px; font-size: 12.5px; color: var(--text-secondary); }
@@ -92,6 +115,6 @@ function splitType(type: string) {
 .err-name { color: var(--status-critical); font-weight: 500; white-space: nowrap; }
 .tiny { font-size: 11.5px; }
 .msg { max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.op { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.op { max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nowrap { white-space: nowrap; }
 </style>

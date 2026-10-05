@@ -172,3 +172,12 @@ select, input[type="number"], input[type="text"] {
   color: var(--text-primary);
   border: 1px solid var(--status-critical);
 }
+
+/* Yazdırma / PDF: menü ve sayfa kontrolleri gizlenir, kartlar sayfa arasında bölünmez */
+@media print {
+  nav.sidebar, .no-print { display: none !important; }
+  .shell { display: block !important; }
+  .content { padding: 0 !important; max-width: none !important; }
+  body { background: #fff; }
+  .card { break-inside: avoid; }
+}

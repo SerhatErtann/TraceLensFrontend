@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { api, type ServiceMap } from '../api'
 import { formatInt, formatMs, formatPercent } from '../format'
-import { RANGES } from '../ranges'
+import { useTimeRange } from '../timeRange'
+import type { Insight } from '../insights'
+import RangePicker from '../components/RangePicker.vue'
+import InsightList from '../components/InsightList.vue'
 
 /**
  * Servis haritası: görevler, servisler, veritabanları ve aralarındaki çağrılar. Soldan sağa çağrı yönünde dizilir;
@@ -12,9 +15,9 @@ import { RANGES } from '../ranges'
 type MapNode = ServiceMap['nodes'][number]
 type MapEdge = ServiceMap['edges'][number]
 
-const route = useRoute()
 const router = useRouter()
-const range = computed(() => (route.query.range as string) || '1h')
+// Zaman aralığı: hazır aralık ya da özel tarih/saat (RangePicker)
+const time = useTimeRange()
 const data = ref<ServiceMap | null>(null)
 const error = ref<string | null>(null)
 const loading = ref(false)
@@ -94,7 +97,7 @@ const nodeName = (id: string) => data.value?.nodes.find(n => n.id === id)?.name 
 
 function openNode(n: MapNode) {
   if (!isLink(n)) return
-  router.push({ path: `/${n.kind === 'service' ? 'services' : 'schedulers'}/${encodeURIComponent(n.id)}`, query: { range: range.value } })
+  router.push({ path: `/${n.kind === 'service' ? 'services' : 'schedulers'}/${encodeURIComponent(n.id)}`, query: time.query.value })
 }
 
 // Bağlantı satırı: çağıran servisin detayında ilgili sekme (dış çağrılar / DB sorguları)
@@ -104,16 +107,35 @@ function openEdge(e: MapEdge) {
   const target = data.value?.nodes.find(n => n.id === e.to)
   router.push({
     path: `/${caller.kind === 'service' ? 'services' : 'schedulers'}/${encodeURIComponent(caller.id)}`,
-    query: { range: range.value, tab: target?.kind === 'database' ? 'db' : 'call' }
+    query: { ...time.query.value, tab: target?.kind === 'database' ? 'db' : 'call' }
   })
 }
 
 const sortedEdges = computed(() => [...(data.value?.edges ?? [])].sort((a, b) => b.count - a.count))
 
+// "Kısaca": en yoğun, en yavaş ve en hatalı bağlantı; sorunlu uygulamalar
+const insights = computed<Insight[]>(() => {
+  const d = data.value
+  if (!d || !d.edges.length) return []
+  const edgeName = (e: MapEdge) => `${nodeName(e.from)} → ${nodeName(e.to)}`
+  const list: Insight[] = []
+  const busiest = sortedEdges.value[0]
+  list.push({ tone: 'info', text: `En yoğun bağlantı: ${edgeName(busiest)} — ${formatInt(busiest.count)} çağrı, ortalama ${formatMs(busiest.avgMs)}.` })
+  const slowest = [...d.edges].sort((a, b) => b.avgMs - a.avgMs)[0]
+  if (slowest !== busiest) list.push({ tone: 'info', text: `En yavaş bağlantı: ${edgeName(slowest)} — ortalama ${formatMs(slowest.avgMs)}, en yavaş yüzde 5 için ${formatMs(slowest.p95Ms)} ve üstü.` })
+  const failing = [...d.edges].filter(e => e.errorCount > 0).sort((a, b) => b.errorRate - a.errorRate)[0]
+  list.push(failing
+    ? { tone: failing.errorRate >= 0.05 ? 'error' : 'slow', text: `Hata oranı en yüksek bağlantı: ${edgeName(failing)} — ${formatInt(failing.errorCount)} hatalı çağrı (oran ${formatPercent(failing.errorRate)}).`, to: undefined }
+    : { tone: 'ok', text: 'Hiçbir bağlantıda hata yok.' })
+  const bad = d.nodes.filter(n => n.status !== 'ok')
+  if (bad.length) list.push({ tone: bad.some(n => n.status === 'error') ? 'error' : 'slow', text: `Dikkat isteyen: ${bad.map(n => `${n.name} (${n.status === 'error' ? 'hata oranı yüksek' : 'yavaş'})`).join(', ')}.`, to: { path: '/issues', query: time.query.value }, linkText: 'sorunlara git' })
+  return list
+})
+
 async function load() {
   loading.value = true
   try {
-    data.value = await api.serviceMap(range.value)
+    data.value = await api.serviceMap(time.win.value)
     error.value = null
     lastLoaded.value = new Date()
   } catch (e) {
@@ -122,9 +144,8 @@ async function load() {
     loading.value = false
   }
 }
-const setRange = (r: string) => router.replace({ query: { ...route.query, range: r } })
 
-watch(range, load)
+watch(() => JSON.stringify(time.win.value), load)
 let timer: number | undefined
 onMounted(() => {
   load()
@@ -140,14 +161,14 @@ onUnmounted(() => window.clearInterval(timer))
       <p class="muted sub">Kim kimi çağırıyor: okun kalınlığı çağrı sayısı, kırmızı ok hata oranı %5 ve üstü. Bir servise tıklayınca detayı açılır.</p>
     </div>
     <div class="head-right">
-      <div class="segmented" role="group" aria-label="Zaman aralığı">
-        <button v-for="r in RANGES" :key="r.value" :class="{ active: range === r.value }" @click="setRange(r.value)">{{ r.label }}</button>
-      </div>
+      <RangePicker />
       <span v-if="lastLoaded" class="muted small">{{ lastLoaded.toLocaleTimeString('tr-TR') }}</span>
     </div>
   </header>
 
   <div v-if="error" class="error-box">{{ error }}</div>
+
+  <InsightList :items="insights" />
 
   <section class="card">
     <div class="legend">
@@ -235,10 +256,6 @@ onUnmounted(() => window.clearInterval(timer))
 .head-right { display: flex; align-items: center; gap: 10px; }
 .small { font-size: 12px; }
 .count { font-weight: 400; font-size: 13px; margin-left: 6px; }
-.segmented { display: inline-flex; border: 1px solid var(--border-strong); border-radius: 6px; overflow: hidden; background: var(--surface-1); }
-.segmented button { border: none; background: transparent; padding: 5px 12px; cursor: pointer; border-right: 1px solid var(--border); }
-.segmented button:last-child { border-right: none; }
-.segmented button.active { background: var(--accent); color: #fff; }
 .section { margin-top: 16px; scroll-margin-top: 16px; }
 .over { color: var(--status-critical); font-weight: 600; }
 .pct { font-size: 11px; margin-left: 4px; }

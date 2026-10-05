@@ -33,7 +33,7 @@ const tiles = computed(() => {
     { action: 'chart' as const, label: 'Ortalama süre', value: formatMs(t.avgMs),
       sub: `eşik ${formatMs(props.thresholdMs)}${t.avgMs > props.thresholdMs ? ' · ▲ üstünde' : ''}`, bad: t.avgMs > props.thresholdMs, hint: 'Süre grafiğini aç',
       delta: p ? compare(t.avgMs, p.avgMs, formatMs(p.avgMs), true) : null },
-    { action: 'slowest' as const, label: 'p95', value: formatMs(t.p95Ms),
+    { action: 'slowest' as const, label: 'p95 · en yavaş %5', value: formatMs(t.p95Ms),
       sub: `max ${formatMs(t.maxMs)}`, bad: t.p95Ms > props.thresholdMs, hint: 'En yavaşları listele',
       delta: p ? compare(t.p95Ms, p.p95Ms, formatMs(p.p95Ms), true) : null },
     { action: 'slow' as const, label: 'Eşiği aşan', value: formatInt(t.slowCount),

@@ -21,9 +21,23 @@ function status(row: Instance) {
   return { kind: 'ok' as const, label: 'Normal' }
 }
 const isActive = (row: Instance) => Date.now() - parseUtc(row.lastSeen).getTime() < ACTIVE_MS
+
+const sentence = computed(() => {
+  const rows = props.rows
+  if (!rows.length) return ''
+  const active = rows.filter(isActive).length
+  const slower = rows.filter(r => status(r).kind === 'slow')
+  const head = rows.length === 1
+    ? 'Bu aralıkta tek bir kopya çalıştı; karşılaştırma için en az iki kopya gerekir.'
+    : `Bu aralıkta ${rows.length} kopya çalıştı, şu an çalışan: ${active}. (Servis yeniden başlatılınca yeni kopya sayılır.)`
+  return slower.length
+    ? `${head} Diğerlerinden belirgin yavaş olan: ${slower.map(r => `${r.instanceId.slice(0, 8)}… (ortalama ${formatMs(r.avgMs)})`).join(', ')}.`
+    : rows.length > 1 ? `${head} Kopyalar arasında belirgin hız farkı yok.` : head
+})
 </script>
 
 <template>
+  <p v-if="sentence" class="sentence">{{ sentence }}</p>
   <div class="table-wrap">
     <table v-if="rows.length" class="data">
       <thead>
@@ -64,6 +78,7 @@ const isActive = (row: Instance) => Date.now() - parseUtc(row.lastSeen).getTime(
 </template>
 
 <style scoped>
+.sentence { margin: 0; padding: 0 16px 10px; font-size: 13px; color: var(--text-secondary); }
 .over { color: var(--status-critical); font-weight: 600; }
 .pct { font-size: 11px; margin-left: 4px; }
 .tiny { font-size: 11.5px; }

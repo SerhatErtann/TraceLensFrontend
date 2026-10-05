@@ -4,7 +4,11 @@ import { useRoute, useRouter } from 'vue-router'
 import { api, spanGroupKey, thresholdKey, type Anatomy, type AppKind, type Histogram, type Instance, type OperationSummary,
   type Outcome, type RequestRow, type ServiceBreakdown, type SpanCategory, type SpanGroup, type ThresholdList, type TimeBucket } from '../api'
 import { formatInt, formatPercent } from '../format'
-import { previousWindow, RANGES, rangeLabel, rangeMs, shiftBuckets } from '../ranges'
+import { shiftBuckets } from '../ranges'
+import { useTimeRange } from '../timeRange'
+import { breakdownInsights, listInsights } from '../insights'
+import RangePicker from '../components/RangePicker.vue'
+import InsightList from '../components/InsightList.vue'
 import StatTiles, { type TileAction } from '../components/StatTiles.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import LatencyChart from '../components/LatencyChart.vue'
@@ -25,7 +29,8 @@ const router = useRouter()
 const SAMPLE_LIMIT = 10
 type Tab = 'ops' | SpanCategory
 
-const range = computed(() => (route.query.range as string) || '1h')
+// Zaman aralığı: hazır aralık ya da özel tarih/saat (RangePicker)
+const time = useTimeRange()
 const tab = computed<Tab>(() => (['method', 'db', 'call'].includes(route.query.tab as string) ? route.query.tab as Tab : 'ops'))
 const isService = computed(() => props.app === 'service')
 const listPath = computed(() => (isService.value ? '/services' : '/schedulers'))
@@ -57,6 +62,23 @@ const customThresholds = computed(() =>
 // Servisler/Görevler sayfasındaki gibi: operasyonların en düşük eşiği
 const thresholdMs = computed(() =>
   operations.value.length ? Math.min(...operations.value.map(o => o.thresholdMs)) : defaultThresholdMs.value)
+
+// "Kısaca" kutusu: Servisler sayfasındaki cümleler + süre nereye gidiyor, N+1 şüphesi
+const insights = computed(() => [
+  ...listInsights({
+    label: time.phrase.value,
+    noun: isService.value ? 'istek' : 'çalışma',
+    opNoun: isService.value ? 'endpoint' : 'görev',
+    totals: totals.value,
+    previous: previousTotals.value,
+    operations: operations.value,
+    outcome: outcomes.value,
+    histogram: histogram.value,
+    thresholdMs: thresholdMs.value,
+    opLink: o => ({ path: listPath.value, query: { ...time.query.value, service: o.service, operation: o.operation }, hash: '#grafik' })
+  }),
+  ...breakdownInsights(breakdown.value)
+])
 
 // Genel Bakış kartı ve Sorunlar ile aynı kural (en az 3 istekli operasyonlar): hata oranı %5 ve üstü olan varsa
 // Hatalı, ortalaması eşiğini aşan varsa Yavaş
@@ -94,14 +116,14 @@ const samplesThreshold = computed(() => selectedOperation.value?.thresholdMs ?? 
 
 async function load() {
   loading.value = true
-  const f = { range: range.value, service: props.service }
-  const previous = { ...f, ...previousWindow(range.value) }
+  const f = { ...time.win.value, service: props.service }
+  const previous = { ...f, ...time.previous() }
   try {
     const [ops, tot, ts, bd, thr, prevTot, prevTs, hist, out, inst] = await Promise.all([
       api.summary(props.app, f),
       api.totals(props.app, f),
       api.timeseries(props.app, f),
-      api.breakdown(props.app, props.service, range.value),
+      api.breakdown(props.app, props.service, time.win.value),
       api.thresholds(),
       api.totals(props.app, previous),
       api.timeseries(props.app, previous),
@@ -115,7 +137,7 @@ async function load() {
     breakdown.value = bd
     thresholds.value = thr
     previousTotals.value = prevTot
-    previousBuckets.value = shiftBuckets(prevTs, rangeMs(range.value))
+    previousBuckets.value = shiftBuckets(prevTs, time.durationMs.value)
     histogram.value = hist
     outcomes.value = out
     instances.value = inst
@@ -133,16 +155,16 @@ async function loadSamples() {
   try {
     if (selectedOperation.value) {
       const operation = selectedOperation.value.operation
-      const f = { range: range.value, service: props.service, operation }
+      const f = { ...time.win.value, service: props.service, operation }
       anatomy.value = null
       const [page, anat] = await Promise.all([
         api.requests(props.app, f, 'duration', SAMPLE_LIMIT, 0),
-        api.anatomy(props.app, props.service, operation, range.value)
+        api.anatomy(props.app, props.service, operation, time.win.value)
       ])
       samples.value = page.items
       anatomy.value = anat
     } else if (selectedGroup.value) {
-      samples.value = await api.spanSamples(props.app, props.service, selectedGroup.value, range.value)
+      samples.value = await api.spanSamples(props.app, props.service, selectedGroup.value, time.win.value)
     }
   } catch (e) {
     samplesError.value = `Örnekler alınamadı: ${(e as Error).message}`
@@ -158,7 +180,7 @@ function clearSelection() {
 
 // Grafikte bir noktaya tıklanınca o aralığın istekleri Servisler/Görevler sayfasında bu servise filtreli listelenir
 function onChartSelect(w: { from: string; to: string }) {
-  router.push({ path: listPath.value, query: { range: range.value, service: props.service, windowFrom: w.from, windowTo: w.to }, hash: '#istekler' })
+  router.push({ path: listPath.value, query: { ...time.query.value, service: props.service, windowFrom: w.from, windowTo: w.to }, hash: '#istekler' })
 }
 
 async function showSamples() {
@@ -199,7 +221,6 @@ async function openDominant() {
   selectGroup(group)
 }
 
-const setRange = (r: string) => router.replace({ query: { ...route.query, range: r } })
 const reduceMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 // Üstteki kutular: grafik bu sayfada; istek listeleri Servisler/Görevler sayfasında bu servise filtreli açılır
@@ -208,13 +229,14 @@ function onTile(action: TileAction) {
     document.getElementById('grafik')?.scrollIntoView({ behavior: reduceMotion() ? 'auto' : 'smooth', block: 'start' })
     return
   }
-  const query: Record<string, string> = { range: range.value, service: props.service }
+  const query: Record<string, string> = { ...time.query.value, service: props.service }
   if (action === 'requests') query.sort = 'time'
   if (action === 'slow' || action === 'errors') query.only = action
   router.push({ path: listPath.value, query, hash: '#istekler' })
 }
 
-watch(() => [props.app, props.service, range.value], () => {
+// Sekme değişimi (?tab=) yeniden yüklemesin diye sadece aralık izlenir
+watch(() => [props.app, props.service, JSON.stringify(time.win.value)], () => {
   load()
   if (selectedOperation.value || selectedGroup.value) loadSamples()
 })
@@ -228,24 +250,24 @@ onUnmounted(() => window.clearInterval(timer))
 </script>
 
 <template>
-  <RouterLink :to="{ path: listPath, query: { range } }" class="crumb">← {{ isService ? 'Servisler' : 'Görevler' }}</RouterLink>
+  <RouterLink :to="{ path: listPath, query: time.query.value }" class="crumb">← {{ isService ? 'Servisler' : 'Görevler' }}</RouterLink>
   <header class="page-header">
     <div>
       <h1 class="mono title">{{ service }}</h1>
       <p class="muted sub">
-        {{ isService ? 'Servis' : 'Görev uygulaması' }} · son {{ rangeLabel(range) }}
+        {{ isService ? 'Servis' : 'Görev uygulaması' }} · {{ time.isCustom.value ? time.label.value : `son ${time.label.value}` }}
         <template v-if="totals"> · {{ formatInt(totals.count) }} {{ isService ? 'istek' : 'çalışma' }} · <StatusBadge v-bind="status" /></template>
       </p>
     </div>
     <div class="head-right">
-      <div class="segmented" role="group" aria-label="Zaman aralığı">
-        <button v-for="r in RANGES" :key="r.value" :class="{ active: range === r.value }" @click="setRange(r.value)">{{ r.label }}</button>
-      </div>
+      <RangePicker />
       <span v-if="lastLoaded" class="muted small">{{ lastLoaded.toLocaleTimeString('tr-TR') }}</span>
     </div>
   </header>
 
   <div v-if="error" class="error-box">{{ error }}</div>
+
+  <InsightList :items="insights" />
 
   <StatTiles :totals="totals" :threshold-ms="thresholdMs" :app="app" :previous="previousTotals" @go="onTile" />
 
@@ -268,7 +290,7 @@ onUnmounted(() => window.clearInterval(timer))
   <section id="grafik" class="card section">
     <div class="card-header">
       <h2>Yanıt süresi</h2>
-      <span class="muted small">{{ isService ? "Tüm endpoint'ler" : 'Tüm görevler' }} · kesikli: önceki {{ rangeLabel(range) }}</span>
+      <span class="muted small">{{ isService ? "Tüm endpoint'ler" : 'Tüm görevler' }} · kesikli çizgi: önceki dönem</span>
     </div>
     <LatencyChart :buckets="buckets" :threshold-ms="thresholdMs" :previous="previousBuckets" drillable @select="onChartSelect" />
   </section>
@@ -322,7 +344,7 @@ onUnmounted(() => window.clearInterval(timer))
         <span class="muted count mono">{{ samplesTitle }}</span>
       </h2>
       <RouterLink v-if="selectedOperation" class="small"
-                  :to="{ path: listPath, query: { range, service, operation: selectedOperation.operation }, hash: '#istekler' }">
+                  :to="{ path: listPath, query: { ...time.query.value, service, operation: selectedOperation.operation }, hash: '#istekler' }">
         Tümünü listele →
       </RouterLink>
       <span v-else class="muted small">Operasyon: çağrının yapıldığı {{ isService ? 'istek' : 'görev' }} · satıra tıklayınca trace açılır</span>
@@ -348,10 +370,6 @@ onUnmounted(() => window.clearInterval(timer))
 .head-right { display: flex; align-items: center; gap: 10px; }
 .small { font-size: 12px; }
 .count { font-weight: 400; font-size: 13px; margin-left: 6px; }
-.segmented { display: inline-flex; border: 1px solid var(--border-strong); border-radius: 6px; overflow: hidden; background: var(--surface-1); }
-.segmented button { border: none; background: transparent; padding: 5px 12px; cursor: pointer; border-right: 1px solid var(--border); }
-.segmented button:last-child { border-right: none; }
-.segmented button.active { background: var(--accent); color: #fff; }
 .section { margin-top: 16px; scroll-margin-top: 16px; }
 
 .crumb { display: inline-block; font-size: 13px; margin-bottom: 8px; }

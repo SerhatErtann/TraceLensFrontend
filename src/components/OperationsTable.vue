@@ -19,13 +19,14 @@ type SortKey = 'operation' | 'count' | 'avgMs' | 'p95Ms' | 'maxMs' | 'slowCount'
 const sortKey = ref<SortKey>('avgMs')
 const sortDesc = ref(true)
 
-const columns: { key: SortKey; label: string; numeric: boolean }[] = [
+// title: başlığın üzerine gelince çıkan açıklama
+const columns: { key: SortKey; label: string; numeric: boolean; title?: string }[] = [
   { key: 'operation', label: 'Operasyon', numeric: false },
   { key: 'count', label: 'İstek', numeric: true },
   { key: 'avgMs', label: 'Ortalama', numeric: true },
-  { key: 'p95Ms', label: 'p95', numeric: true },
-  { key: 'maxMs', label: 'Max', numeric: true },
-  { key: 'slowCount', label: 'Eşiği aşan', numeric: true },
+  { key: 'p95Ms', label: 'p95', numeric: true, title: 'İsteklerin yüzde 95 i bu süreden kısa; en yavaş yüzde 5 bunun üstünde' },
+  { key: 'maxMs', label: 'Max', numeric: true, title: 'Bu aralıktaki en uzun istek' },
+  { key: 'slowCount', label: 'Eşiği aşan', numeric: true, title: 'Süresi eşikten uzun olan istek sayısı ve oranı' },
   { key: 'errorCount', label: 'Hata', numeric: true }
 ]
 
@@ -62,7 +63,7 @@ const rowKey = (r: OperationSummary) => `${r.service}|${r.operation}`
         <tr>
           <th>Durum</th>
           <th>{{ app === 'service' ? 'Servis' : 'Uygulama' }}</th>
-          <th v-for="c in columns" :key="c.key" class="sortable" :class="{ num: c.numeric }" @click="sortBy(c.key)"
+          <th v-for="c in columns" :key="c.key" class="sortable" :class="{ num: c.numeric }" :title="c.title" @click="sortBy(c.key)"
               :aria-sort="sortKey === c.key ? (sortDesc ? 'descending' : 'ascending') : 'none'">
             {{ c.label }}<span v-if="sortKey === c.key" class="arrow">{{ sortDesc ? '↓' : '↑' }}</span>
           </th>
