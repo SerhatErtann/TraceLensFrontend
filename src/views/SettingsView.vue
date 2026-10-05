@@ -61,7 +61,7 @@ onMounted(load)
   <section v-if="thresholds" class="card">
     <div class="card-header"><h2>Varsayılan eşik</h2></div>
     <form class="default-form" @submit.prevent="saveDefault">
-      <p class="secondary">Özel eşiği olmayan tüm endpoint ve job'lar için "yavaş" sınırı.</p>
+      <p class="secondary">Özel eşiği olmayan tüm endpoint ve görevler için "yavaş" sınırı.</p>
       <div class="row">
         <input v-model.number="defaultValue" type="number" min="1" max="600000" step="any" aria-label="Varsayılan eşik (ms)" />
         <span class="muted">ms</span>
@@ -76,7 +76,7 @@ onMounted(load)
   <section v-if="thresholds" class="card section">
     <div class="card-header">
       <h2>Özel eşikler <span class="muted count">{{ thresholds.overrides.length }}</span></h2>
-      <span class="muted small">Yeni özel eşik eklemek için Services veya Schedulers sayfasındaki tabloda ✎'ye tıklayın</span>
+      <span class="muted small">Yeni özel eşik eklemek için Servisler veya Görevler sayfasındaki tabloda ✎'ye tıklayın</span>
     </div>
     <div v-if="thresholds.overrides.length" class="table-wrap">
       <table class="data">

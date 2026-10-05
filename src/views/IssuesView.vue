@@ -131,7 +131,7 @@ onUnmounted(() => window.clearInterval(timer))
           <span class="status" :class="i.kind">{{ i.kind === 'error' ? 'Hatalı' : 'Yavaş' }}</span>
           <span class="mono op">{{ i.operation }}</span>
           <span class="tag">{{ i.service }}</span>
-          <span v-if="i.app === 'Scheduler'" class="tag">job</span>
+          <span v-if="i.app === 'Scheduler'" class="tag">görev</span>
           <span v-if="i.alarmActive" class="tag alarm">Alarm açık</span>
         </div>
         <div class="why">{{ reason(i) }}</div>

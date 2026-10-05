@@ -17,8 +17,16 @@ const error = ref<string | null>(null)
 const loading = ref(false)
 const lastLoaded = ref<Date | null>(null)
 
-const services = computed(() => data.value?.services.filter(s => s.app === 'Service') ?? [])
-const schedulers = computed(() => data.value?.services.filter(s => s.app === 'Scheduler') ?? [])
+// Her bölümde en fazla bu kadar kart; fazlası için "Tümünü gör" ilgili sayfaya götürür (liste zaten önce sorunlular sıralı)
+const CARD_LIMIT = 5
+
+const groups = computed(() => {
+  const all = data.value?.services ?? []
+  return [
+    { id: 'servisler', title: 'Servisler', path: '/services', list: all.filter(s => s.app === 'Service') },
+    { id: 'gorevler', title: 'Görevler', path: '/schedulers', list: all.filter(s => s.app === 'Scheduler') }
+  ].map(g => ({ ...g, total: g.list.length, list: g.list.slice(0, CARD_LIMIT) }))
+})
 
 const statusLabel: Record<ServiceCard['status'], string> = { ok: 'Normal', slow: 'Yavaş', error: 'Hatalı' }
 
@@ -75,7 +83,7 @@ onUnmounted(() => window.clearInterval(timer))
   <header class="page-header">
     <div>
       <h1>Genel Bakış</h1>
-      <p class="muted sub">Tüm servisler ve scheduler'lar. Bir karta tıklayınca o servisin endpoint'leri ve istekleri açılır.</p>
+      <p class="muted sub">Tüm servisler ve zamanlanmış görevler. Bir karta tıklayınca o uygulamanın endpoint'leri ve istekleri açılır.</p>
     </div>
     <div class="head-right">
       <div class="segmented" role="group" aria-label="Zaman aralığı">
@@ -90,7 +98,7 @@ onUnmounted(() => window.clearInterval(timer))
   <template v-if="data">
     <div class="tiles">
       <KpiTile label="Uygulama" :value="formatInt(data.totals.serviceCount + data.totals.schedulerCount)"
-               :sub="`${data.totals.serviceCount} servis · ${data.totals.schedulerCount} scheduler`"
+               :sub="`${data.totals.serviceCount} servis · ${data.totals.schedulerCount} görev`"
                hint="Uygulamaları gör" @go="scrollTo('servisler')" />
       <KpiTile label="Toplam istek" :value="formatInt(data.totals.requestCount)"
                :sub="`saniyede ort. ${data.totals.requestsPerSecond.toLocaleString('tr-TR')}`" hint="İstekleri listele"
@@ -106,11 +114,13 @@ onUnmounted(() => window.clearInterval(timer))
                :bad="data.totals.activeAlertCount > 0" hint="Alarmları gör" @go="router.push('/alerts')" />
     </div>
 
-    <section v-for="group in [{ id: 'servisler', title: 'Servisler', list: services }, { id: 'schedulerlar', title: `Scheduler'lar`, list: schedulers }]"
-             :id="group.id" :key="group.id" class="card section">
+    <section v-for="group in groups" :id="group.id" :key="group.id" class="card section">
       <div class="card-head">
-        <h2>{{ group.title }} <span class="muted count">{{ group.list.length }}</span></h2>
-        <span class="muted small">Önce sorunlu olanlar</span>
+        <h2>{{ group.title }} <span class="muted count">{{ group.total }}</span></h2>
+        <RouterLink v-if="group.total > CARD_LIMIT" :to="{ path: group.path, query: { range } }" class="small more">
+          Tümünü gör ({{ group.total }}) →
+        </RouterLink>
+        <span v-else class="muted small">Önce sorunlu olanlar</span>
       </div>
       <div v-if="group.list.length" class="grid">
         <button v-for="s in group.list" :key="s.service" class="svc" type="button" @click="openService(s)"
@@ -156,7 +166,7 @@ onUnmounted(() => window.clearInterval(timer))
     <div class="pair section">
       <section class="card">
         <div class="card-head">
-          <h2>En yavaş endpoint ve job'lar</h2>
+          <h2>En yavaş endpoint ve görevler</h2>
           <span class="muted small">ortalama süre · çubuk: eşiğe oranı</span>
         </div>
         <table v-if="data.slowestOperations.length" class="data">
@@ -164,7 +174,7 @@ onUnmounted(() => window.clearInterval(timer))
             <tr v-for="o in data.slowestOperations" :key="o.app + o.service + o.operation" class="clickable" @click="openOperation(o)">
               <td class="op-cell">
                 <div class="mono op" :title="o.operation">{{ o.operation }}</div>
-                <div class="muted tiny">{{ o.service }}{{ o.app === 'Scheduler' ? ' · job' : '' }} · {{ formatInt(o.count) }} {{ o.app === 'Service' ? 'istek' : 'çalışma' }}</div>
+                <div class="muted tiny">{{ o.service }}{{ o.app === 'Scheduler' ? ' · görev' : '' }} · {{ formatInt(o.count) }} {{ o.app === 'Service' ? 'istek' : 'çalışma' }}</div>
               </td>
               <td class="bar-cell">
                 <div class="bar" :title="`Eşik ${formatMs(o.thresholdMs)}`">
@@ -189,7 +199,7 @@ onUnmounted(() => window.clearInterval(timer))
             <tr v-for="o in data.mostErrors" :key="o.app + o.service + o.operation" class="clickable" @click="openOperation(o)">
               <td class="op-cell">
                 <div class="mono op" :title="o.operation">{{ o.operation }}</div>
-                <div class="muted tiny">{{ o.service }}{{ o.app === 'Scheduler' ? ' · job' : '' }}</div>
+                <div class="muted tiny">{{ o.service }}{{ o.app === 'Scheduler' ? ' · görev' : '' }}</div>
               </td>
               <td class="num">
                 <b>{{ formatInt(o.errorCount) }}</b>
@@ -243,6 +253,7 @@ onUnmounted(() => window.clearInterval(timer))
 .segmented button.active { background: var(--accent); color: #fff; }
 .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
 .section { margin-top: 16px; scroll-margin-top: 16px; }
+.more { font-weight: 600; white-space: nowrap; }
 .pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; }
 .pair > .card { min-width: 0; }
 .tiny { font-size: 11.5px; }

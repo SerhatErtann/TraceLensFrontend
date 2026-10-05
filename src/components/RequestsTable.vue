@@ -33,7 +33,7 @@ function status(row: RequestRow) {
       <thead>
         <tr>
           <th>Zaman</th>
-          <th>{{ app === 'service' ? 'Servis' : 'Scheduler' }}</th>
+          <th>{{ app === 'service' ? 'Servis' : 'Uygulama' }}</th>
           <th>Operasyon</th>
           <th class="num">Süre</th>
           <th>Sonuç</th>

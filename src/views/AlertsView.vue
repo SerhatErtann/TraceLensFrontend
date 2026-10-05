@@ -38,6 +38,8 @@ const linkFor = (a: Alert) => ({
   query: { range: '15m', service: a.service, operation: a.operation }
 })
 
+const appLabel = (app: Alert['app']) => (app === 'Service' ? 'Servis' : 'Görev')
+
 const formatDuration = (minutes: number) =>
   minutes < 1 ? '<1 dk' : minutes < 60 ? `${Math.round(minutes)} dk` : `${(minutes / 60).toFixed(1)} sa`
 
@@ -92,7 +94,7 @@ onUnmounted(() => window.clearInterval(timer))
       <tbody>
         <tr v-for="a in active" :key="a.id" class="clickable" @click="$router.push(linkFor(a))">
           <td><StatusBadge kind="slow" label="Eşik aşıldı" /></td>
-          <td class="secondary">{{ a.app }}</td>
+          <td class="secondary">{{ appLabel(a.app) }}</td>
           <td class="secondary">{{ a.service }}</td>
           <td class="mono">{{ a.operation }}</td>
           <td class="num over">{{ a.metric }} {{ formatMs(a.valueMs) }}</td>
@@ -131,7 +133,7 @@ onUnmounted(() => window.clearInterval(timer))
       </thead>
       <tbody>
         <tr v-for="a in history" :key="a.id" class="clickable" @click="$router.push(linkFor(a))">
-          <td class="secondary">{{ a.app }}</td>
+          <td class="secondary">{{ appLabel(a.app) }}</td>
           <td class="secondary">{{ a.service }}</td>
           <td class="mono">{{ a.operation }}</td>
           <td class="num">{{ a.metric }} {{ formatMs(a.peakValueMs) }}</td>

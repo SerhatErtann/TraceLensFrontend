@@ -60,8 +60,8 @@ onUnmounted(() => window.clearInterval(timer))
         <span v-if="openIssues" class="badge" :aria-label="`${openIssues} açık sorun`">{{ openIssues }}</span>
       </RouterLink>
       <div class="sep" role="separator" />
-      <RouterLink to="/services" class="nav-item">Services</RouterLink>
-      <RouterLink to="/schedulers" class="nav-item">Schedulers</RouterLink>
+      <RouterLink to="/services" class="nav-item">Servisler</RouterLink>
+      <RouterLink to="/schedulers" class="nav-item">Görevler</RouterLink>
       <RouterLink to="/alerts" class="nav-item">
         Alarmlar
         <span v-if="activeAlerts" class="badge" :aria-label="`${activeAlerts} aktif alarm`">{{ activeAlerts }}</span>

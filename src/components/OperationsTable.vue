@@ -61,7 +61,7 @@ const rowKey = (r: OperationSummary) => `${r.service}|${r.operation}`
       <thead>
         <tr>
           <th>Durum</th>
-          <th>{{ app === 'service' ? 'Servis' : 'Scheduler' }}</th>
+          <th>{{ app === 'service' ? 'Servis' : 'Uygulama' }}</th>
           <th v-for="c in columns" :key="c.key" class="sortable" :class="{ num: c.numeric }" @click="sortBy(c.key)"
               :aria-sort="sortKey === c.key ? (sortDesc ? 'descending' : 'ascending') : 'none'">
             {{ c.label }}<span v-if="sortKey === c.key" class="arrow">{{ sortDesc ? '↓' : '↑' }}</span>

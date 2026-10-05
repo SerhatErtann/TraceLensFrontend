@@ -4,7 +4,7 @@ import type { OperationSummary } from '../api'
 import { formatInt, formatMs, formatPercent } from '../format'
 import KpiTile from './KpiTile.vue'
 
-/** Services/Schedulers sayfasının özet kutuları. Her biri sayfadaki ilgili bölüme götürür. */
+/** Servisler/Görevler sayfasının özet kutuları. Her biri sayfadaki ilgili bölüme götürür. */
 export type TileAction = 'requests' | 'chart' | 'slowest' | 'slow' | 'errors'
 
 const props = defineProps<{ totals: OperationSummary | null; thresholdMs: number; app: 'service' | 'scheduler' }>()

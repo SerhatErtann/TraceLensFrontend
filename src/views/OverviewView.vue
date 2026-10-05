@@ -69,11 +69,11 @@ function onTile(action: TileAction) {
   scrollToSection('istekler')
 }
 
-const title = computed(() => (props.app === 'service' ? 'Services' : 'Schedulers'))
+const title = computed(() => (props.app === 'service' ? 'Servisler' : 'Görevler'))
 const subtitle = computed(() =>
   props.app === 'service'
     ? 'Gelen HTTP istekleri: süre, eşik aşımı ve hata dağılımı'
-    : 'Job çalıştırmaları: süre, eşik aşımı ve başarısız çalışmalar'
+    : 'Zamanlanmış görev çalışmaları: süre, eşik aşımı ve başarısız çalışmalar'
 )
 
 const operationOptions = computed(() =>
@@ -170,14 +170,14 @@ onUnmounted(() => window.clearInterval(timer))
       <button v-for="r in RANGES" :key="r.value" :class="{ active: filters.range === r.value }"
               @click="setFilter({ range: r.value })">{{ r.label }}</button>
     </div>
-    <select :value="filters.service ?? ''" aria-label="Servis"
+    <select :value="filters.service ?? ''" :aria-label="app === 'service' ? 'Servis' : 'Uygulama'"
             @change="setFilter({ service: ($event.target as HTMLSelectElement).value, operation: undefined })">
-      <option value="">Tüm {{ app === 'service' ? 'servisler' : "scheduler'lar" }}</option>
+      <option value="">Tüm {{ app === 'service' ? 'servisler' : 'uygulamalar' }}</option>
       <option v-for="s in services" :key="s" :value="s">{{ s }}</option>
     </select>
     <select :value="filters.operation ?? ''" aria-label="Operasyon" class="op-select"
             @change="setFilter({ operation: ($event.target as HTMLSelectElement).value })">
-      <option value="">Tüm {{ app === 'service' ? "endpoint'ler" : "job'lar" }}</option>
+      <option value="">Tüm {{ app === 'service' ? "endpoint'ler" : 'görevler' }}</option>
       <option v-for="o in operationOptions" :key="o" :value="o">{{ o }}</option>
     </select>
     <label class="min-dur">
@@ -206,7 +206,7 @@ onUnmounted(() => window.clearInterval(timer))
 
   <section class="card section">
     <div class="card-header">
-      <h2>{{ app === 'service' ? "Endpoint'ler" : "Job'lar" }}</h2>
+      <h2>{{ app === 'service' ? "Endpoint'ler" : 'Görevler' }}</h2>
       <span class="muted small">Satıra tıklayınca grafik ve istek listesi o operasyona göre filtrelenir · eşiği değiştirmek için ✎</span>
     </div>
     <OperationsTable :rows="operations" :selected="filters.operation" :app="app"
