@@ -17,16 +17,47 @@ const error = ref<string | null>(null)
 const loading = ref(false)
 const lastLoaded = ref<Date | null>(null)
 
-// Her bölümde en fazla bu kadar kart; fazlası için "Tümünü gör" ilgili sayfaya götürür (liste zaten önce sorunlular sıralı)
+// Her bölümde en fazla bu kadar kart; tamamı için "Tümünü gör" ilgili sayfaya götürür (liste zaten önce sorunlular sıralı)
 const CARD_LIMIT = 5
+
+// İstek listesindeki gibi iki onay kutusu; ikisi birden işaretliyse ikisini de sağlayanlar kalır.
+// "Eşiği aşan": en az bir endpoint/görevi eşiğini aşıyor; "Hatalı": hata oranı %5 ve üstü
+type CardFilter = { onlySlow: boolean; onlyErrors: boolean }
+const isSlowCard = (s: ServiceCard) => s.slowOperationCount > 0
+const isErrorCard = (s: ServiceCard) => s.status === 'error'
+const matches = (s: ServiceCard, f: CardFilter) => (!f.onlySlow || isSlowCard(s)) && (!f.onlyErrors || isErrorCard(s))
+
+const cardFilter = ref<Record<string, CardFilter>>({
+  servisler: { onlySlow: false, onlyErrors: false },
+  gorevler: { onlySlow: false, onlyErrors: false }
+})
 
 const groups = computed(() => {
   const all = data.value?.services ?? []
   return [
-    { id: 'servisler', title: 'Servisler', path: '/services', list: all.filter(s => s.app === 'Service') },
-    { id: 'gorevler', title: 'Görevler', path: '/schedulers', list: all.filter(s => s.app === 'Scheduler') }
-  ].map(g => ({ ...g, total: g.list.length, list: g.list.slice(0, CARD_LIMIT) }))
+    { id: 'servisler', title: 'Servisler', path: '/services', noun: 'servis', items: all.filter(s => s.app === 'Service') },
+    { id: 'gorevler', title: 'Görevler', path: '/schedulers', noun: 'görev uygulaması', items: all.filter(s => s.app === 'Scheduler') }
+  ].map(g => {
+    const filter = cardFilter.value[g.id]
+    const filtered = g.items.filter(s => matches(s, filter))
+    return {
+      ...g,
+      filter,
+      total: g.items.length,
+      slowCount: g.items.filter(isSlowCard).length,
+      errorCount: g.items.filter(isErrorCard).length,
+      shown: filtered.slice(0, CARD_LIMIT),
+      hidden: Math.max(0, filtered.length - CARD_LIMIT)
+    }
+  })
 })
+
+function emptyText(noun: string, f: CardFilter) {
+  if (f.onlySlow && f.onlyErrors) return `Hem eşiği aşan hem hatalı ${noun} yok`
+  if (f.onlySlow) return `Eşiği aşan ${noun} yok`
+  if (f.onlyErrors) return `Hatalı ${noun} yok`
+  return 'Bu aralıkta veri yok'
+}
 
 const statusLabel: Record<ServiceCard['status'], string> = { ok: 'Normal', slow: 'Yavaş', error: 'Hatalı' }
 
@@ -117,13 +148,22 @@ onUnmounted(() => window.clearInterval(timer))
     <section v-for="group in groups" :id="group.id" :key="group.id" class="card section">
       <div class="card-head">
         <h2>{{ group.title }} <span class="muted count">{{ group.total }}</span></h2>
-        <RouterLink v-if="group.total > CARD_LIMIT" :to="{ path: group.path, query: { range } }" class="small more">
-          Tümünü gör ({{ group.total }}) →
-        </RouterLink>
-        <span v-else class="muted small">Önce sorunlu olanlar</span>
+        <div class="head-tools">
+          <label class="check">
+            <input v-model="cardFilter[group.id].onlySlow" type="checkbox" />
+            Sadece eşiği aşanlar <span class="n">{{ group.slowCount }}</span>
+          </label>
+          <label class="check">
+            <input v-model="cardFilter[group.id].onlyErrors" type="checkbox" />
+            Sadece hatalılar <span class="n">{{ group.errorCount }}</span>
+          </label>
+          <RouterLink :to="{ path: group.path, query: { range } }" class="small more">
+            Tümünü gör ({{ group.total }}) →
+          </RouterLink>
+        </div>
       </div>
-      <div v-if="group.list.length" class="grid">
-        <button v-for="s in group.list" :key="s.service" class="svc" type="button" @click="openService(s)"
+      <div v-if="group.shown.length" class="grid">
+        <button v-for="s in group.shown" :key="s.service" class="svc" type="button" @click="openService(s)"
                 :aria-label="`${s.service}: ${statusLabel[s.status]}, detayına git`">
           <span class="stripe" :class="s.status" />
           <span class="top">
@@ -151,7 +191,10 @@ onUnmounted(() => window.clearInterval(timer))
           </span>
         </button>
       </div>
-      <div v-else class="empty">Bu aralıkta veri yok</div>
+      <div v-else class="empty">{{ emptyText(group.noun, group.filter) }}</div>
+      <RouterLink v-if="group.hidden" :to="{ path: group.path, query: { range } }" class="hidden-note small">
+        +{{ group.hidden }} {{ group.noun }} daha · Tümünü gör →
+      </RouterLink>
     </section>
 
     <!-- Tüm uygulamaların süre seyri -->
@@ -254,6 +297,11 @@ onUnmounted(() => window.clearInterval(timer))
 .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
 .section { margin-top: 16px; scroll-margin-top: 16px; }
 .more { font-weight: 600; white-space: nowrap; }
+.head-tools { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; justify-content: flex-end; }
+/* İstek listesindeki "Sadece eşiği aşanlar / Sadece hatalılar" kutularıyla aynı görünüm */
+.check { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; cursor: pointer; white-space: nowrap; }
+.check .n { font-size: 11.5px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.hidden-note { display: block; padding: 0 16px 14px; }
 .pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; }
 .pair > .card { min-width: 0; }
 .tiny { font-size: 11.5px; }
