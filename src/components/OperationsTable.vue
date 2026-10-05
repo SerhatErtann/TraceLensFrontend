@@ -74,8 +74,8 @@ const rowKey = (r: OperationSummary) => `${r.service}|${r.operation}`
         <tr v-for="row in sorted" :key="rowKey(row)" class="clickable"
             :class="{ selected: selected === row.operation }" @click="emit('select', row)">
           <td><StatusBadge v-bind="status(row)" /></td>
-          <td class="secondary">{{ row.service }}</td>
-          <td class="mono op">{{ row.operation }}</td>
+          <td class="secondary nowrap">{{ row.service }}</td>
+          <td class="mono op"><template v-for="(part, i) in row.operation.split('/')" :key="i"><wbr v-if="i" />{{ i ? '/' : '' }}{{ part }}</template></td>
           <td class="num">{{ formatInt(row.count) }}</td>
           <td class="num" :class="{ over: row.avgMs > row.thresholdMs }">{{ formatMs(row.avgMs) }}</td>
           <td class="num" :class="{ over: row.p95Ms > row.thresholdMs }">{{ formatMs(row.p95Ms) }}</td>
@@ -103,7 +103,8 @@ const rowKey = (r: OperationSummary) => `${r.service}|${r.operation}`
 
 <style scoped>
 .table-wrap { overflow-x: auto; }
-.op { word-break: break-all; }
+/* Uzun yollar kelime ortasından değil sadece "/" önünden alt satıra geçer */
+.op { min-width: 180px; }
 .over { color: var(--status-critical); font-weight: 600; }
 .pct { font-size: 11px; margin-left: 4px; }
 .arrow { margin-left: 3px; }

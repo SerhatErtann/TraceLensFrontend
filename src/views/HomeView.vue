@@ -44,8 +44,6 @@ const groups = computed(() => {
       ...g,
       filter,
       total: g.items.length,
-      slowCount: g.items.filter(isSlowCard).length,
-      errorCount: g.items.filter(isErrorCard).length,
       shown: filtered.slice(0, CARD_LIMIT),
       hidden: Math.max(0, filtered.length - CARD_LIMIT)
     }
@@ -146,20 +144,12 @@ onUnmounted(() => window.clearInterval(timer))
     </div>
 
     <section v-for="group in groups" :id="group.id" :key="group.id" class="card section">
-      <div class="card-head">
+      <div class="card-header">
         <h2>{{ group.title }} <span class="muted count">{{ group.total }}</span></h2>
-        <div class="head-tools">
-          <label class="check">
-            <input v-model="cardFilter[group.id].onlySlow" type="checkbox" />
-            Sadece eşiği aşanlar <span class="n">{{ group.slowCount }}</span>
-          </label>
-          <label class="check">
-            <input v-model="cardFilter[group.id].onlyErrors" type="checkbox" />
-            Sadece hatalılar <span class="n">{{ group.errorCount }}</span>
-          </label>
-          <RouterLink :to="{ path: group.path, query: { range } }" class="small more">
-            Tümünü gör ({{ group.total }}) →
-          </RouterLink>
+        <div class="list-controls">
+          <label><input v-model="cardFilter[group.id].onlySlow" type="checkbox" /> Sadece eşiği aşanlar</label>
+          <label><input v-model="cardFilter[group.id].onlyErrors" type="checkbox" /> Sadece hatalılar</label>
+          <RouterLink :to="{ path: group.path, query: { range } }">Tümünü gör ({{ group.total }}) →</RouterLink>
         </div>
       </div>
       <div v-if="group.shown.length" class="grid">
@@ -199,7 +189,7 @@ onUnmounted(() => window.clearInterval(timer))
 
     <!-- Tüm uygulamaların süre seyri -->
     <section id="sure" class="card section">
-      <div class="card-head">
+      <div class="card-header">
         <h2>Yanıt süresi · tüm uygulamalar</h2>
         <RouterLink :to="{ path: '/services', query: { range } }" class="small">Servis bazında incele →</RouterLink>
       </div>
@@ -208,7 +198,7 @@ onUnmounted(() => window.clearInterval(timer))
 
     <div class="pair section">
       <section class="card">
-        <div class="card-head">
+        <div class="card-header">
           <h2>En yavaş endpoint ve görevler</h2>
           <span class="muted small">ortalama süre · çubuk: eşiğe oranı</span>
         </div>
@@ -233,7 +223,7 @@ onUnmounted(() => window.clearInterval(timer))
       </section>
 
       <section class="card">
-        <div class="card-head">
+        <div class="card-header">
           <h2>En çok hata verenler</h2>
           <span class="muted small">hatalı istek sayısı</span>
         </div>
@@ -256,7 +246,7 @@ onUnmounted(() => window.clearInterval(timer))
     </div>
 
     <section class="card section">
-      <div class="card-head">
+      <div class="card-header">
         <h2>Son hatalar</h2>
         <RouterLink :to="{ path: '/services', query: { range, only: 'errors', sort: 'time' }, hash: '#istekler' }" class="small">
           Tüm hatalı istekler →
@@ -296,11 +286,6 @@ onUnmounted(() => window.clearInterval(timer))
 .segmented button.active { background: var(--accent); color: #fff; }
 .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
 .section { margin-top: 16px; scroll-margin-top: 16px; }
-.more { font-weight: 600; white-space: nowrap; }
-.head-tools { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; justify-content: flex-end; }
-/* İstek listesindeki "Sadece eşiği aşanlar / Sadece hatalılar" kutularıyla aynı görünüm */
-.check { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; cursor: pointer; white-space: nowrap; }
-.check .n { font-size: 11.5px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .hidden-note { display: block; padding: 0 16px 14px; }
 .pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; }
 .pair > .card { min-width: 0; }

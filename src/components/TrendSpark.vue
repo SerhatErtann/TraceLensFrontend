@@ -15,8 +15,9 @@ const props = defineProps<{
 }>()
 
 const W = 260
-const H = 64
-const PAD = { top: 12, bottom: 14, left: 2, right: 2 }
+// Zaman etiketleri SVG'nin altında ayrı satırda; alt boşluk sadece nokta yarıçapı kadar
+const H = 52
+const PAD = { top: 12, bottom: 4, left: 2, right: 2 }
 const clipId = `over-${useId()}`
 const hover = ref<number | null>(null)
 
@@ -113,7 +114,7 @@ const tooltipLeft = computed(() => (hover.value === null ? 0 : Math.min(78, Math
 .peak { font-variant-numeric: tabular-nums; }
 .peak.over { color: var(--status-critical); font-weight: 600; }
 .plot { position: relative; }
-svg { display: block; width: 100%; height: 64px; overflow: visible; touch-action: none; }
+svg { display: block; width: 100%; height: 52px; overflow: visible; touch-action: none; }
 .base { stroke: var(--grid); stroke-width: 1; vector-effect: non-scaling-stroke; }
 .area { fill: var(--accent); opacity: 0.1; }
 .line { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; vector-effect: non-scaling-stroke; }

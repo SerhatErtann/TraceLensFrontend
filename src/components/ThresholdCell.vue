@@ -59,13 +59,13 @@ const resetToDefault = () => run(() => api.deleteThreshold(props.service, props.
 
 <template>
   <div class="cell" @click.stop>
-    <template v-if="!editing">
+    <div v-if="!editing" class="row">
       <span class="value" :class="{ custom: isCustom }">{{ formatMs(thresholdMs) }}</span>
       <span v-if="isCustom" class="tag" title="Bu operasyona özel eşik">özel</span>
       <button class="icon-btn" :aria-label="`${operation} eşiğini düzenle`" title="Eşiği düzenle" @click="startEdit">
         <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M11 2.5l2.5 2.5L6 12.5H3.5V10z" /></svg>
       </button>
-    </template>
+    </div>
 
     <form v-else class="editor" @submit.prevent="save" @keydown.esc="editing = false">
       <input ref="input" v-model.number="value" type="number" min="1" max="600000" step="any"
@@ -83,7 +83,9 @@ const resetToDefault = () => run(() => api.deleteThreshold(props.service, props.
 </template>
 
 <style scoped>
-.cell { display: flex; align-items: center; justify-content: flex-end; gap: 6px; flex-wrap: wrap; }
+.cell { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+/* Değer, özel etiketi ve kalem tek satırda kalır */
+.row { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
 .value { color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .value.custom { color: var(--text-primary); font-weight: 600; }
 .tag {
@@ -111,5 +113,5 @@ const resetToDefault = () => run(() => api.deleteThreshold(props.service, props.
 .btn.small { padding: 2px 8px; font-size: 12px; }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 .btn.primary:hover:not(:disabled) { background: var(--accent); filter: brightness(1.08); }
-.error { flex-basis: 100%; text-align: right; font-size: 11.5px; color: var(--status-critical); }
+.error { text-align: right; font-size: 11.5px; color: var(--status-critical); }
 </style>

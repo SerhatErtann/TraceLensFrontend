@@ -141,7 +141,7 @@ onUnmounted(() => window.clearInterval(timer))
         <span>{{ i.kind === 'error' ? 'hata' : 'ortalama' }}</span>
         <span v-if="i.alarmSince">alarm {{ relativeTime(i.alarmSince) }}</span>
         <span v-else>son: {{ relativeTime(i.lastSeen) }}</span>
-        <RouterLink :to="operationLink(i)" class="link" @click.stop>Endpoint sayfası</RouterLink>
+        <RouterLink :to="operationLink(i)" class="link" @click.stop>{{ i.app === 'Scheduler' ? 'Görev sayfası' : 'Endpoint sayfası' }}</RouterLink>
       </div>
     </div>
     <div v-if="!visible.length && !loading" class="empty">

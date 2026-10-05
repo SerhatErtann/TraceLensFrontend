@@ -88,7 +88,10 @@ const customThresholds = computed(() =>
 const thresholdMs = computed(() => {
   const selected = operations.value.find(o =>
     o.operation === filters.value.operation && (!filters.value.service || o.service === filters.value.service))
-  return selected?.thresholdMs ?? defaultThresholdMs.value
+  if (selected) return selected.thresholdMs
+  // Operasyon seçili değilse görünen operasyonların en düşük eşiği (görevlerin kendi eşikleri varsayılan 200 ms'den yüksek olabilir)
+  const visible = operations.value.filter(o => !filters.value.service || o.service === filters.value.service)
+  return visible.length ? Math.min(...visible.map(o => o.thresholdMs)) : defaultThresholdMs.value
 })
 
 function thresholdFor(row: RequestRow) {
@@ -219,7 +222,7 @@ onUnmounted(() => window.clearInterval(timer))
       <h2>{{ app === 'service' ? 'İstekler' : 'Çalışmalar' }}
         <span v-if="requests" class="muted count">{{ formatInt(requests.total) }}</span>
       </h2>
-      <div class="req-controls">
+      <div class="list-controls">
         <label><input v-model="onlySlow" type="checkbox" /> Sadece eşiği aşanlar</label>
         <label><input v-model="onlyErrors" type="checkbox" /> Sadece hatalılar</label>
         <select v-model="sort" aria-label="Sıralama">
@@ -276,8 +279,6 @@ onUnmounted(() => window.clearInterval(timer))
 .section { margin-top: 16px; }
 .small { font-size: 12px; }
 .count { font-weight: 400; font-size: 13px; margin-left: 6px; }
-.req-controls { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; font-size: 13px; }
-.req-controls label { display: flex; align-items: center; gap: 5px; }
 .pager {
   display: flex;
   align-items: center;
