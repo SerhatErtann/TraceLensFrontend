@@ -1,9 +1,13 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { RequestRow } from '../api'
 import { formatBytes, formatDateTime, formatMs } from '../format'
 import StatusBadge from './StatusBadge.vue'
 
-defineProps<{ rows: RequestRow[]; app: 'service' | 'scheduler'; thresholdFor: (row: RequestRow) => number }>()
+const props = defineProps<{ rows: RequestRow[]; app: 'service' | 'scheduler'; thresholdFor: (row: RequestRow) => number }>()
+
+// Resmi OpenTelemetry paketleri yanıt boyutunu kaydetmez; hiçbir satırda yoksa boş sütun gösterilmez.
+const showSize = computed(() => props.app === 'service' && props.rows.some(r => r.responseBytes != null))
 
 function status(row: RequestRow) {
   if (row.status === 'Error') {
@@ -23,7 +27,7 @@ function status(row: RequestRow) {
           <th>Operasyon</th>
           <th class="num">Süre</th>
           <th>Sonuç</th>
-          <th v-if="app === 'service'" class="num">Yanıt boyutu</th>
+          <th v-if="showSize" class="num">Yanıt boyutu</th>
           <th>Trace</th>
         </tr>
       </thead>
@@ -40,7 +44,7 @@ function status(row: RequestRow) {
             <StatusBadge v-bind="status(row)" />
             <div v-if="row.statusMessage" class="msg muted" :title="row.statusMessage">{{ row.statusMessage }}</div>
           </td>
-          <td v-if="app === 'service'" class="num secondary">{{ formatBytes(row.responseBytes) }}</td>
+          <td v-if="showSize" class="num secondary">{{ formatBytes(row.responseBytes) }}</td>
           <td><RouterLink :to="`/traces/${row.traceId}`" class="mono" @click.stop>{{ row.traceId.slice(0, 12) }}…</RouterLink></td>
         </tr>
       </tbody>
