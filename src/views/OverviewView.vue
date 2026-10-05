@@ -193,6 +193,10 @@ onUnmounted(() => window.clearInterval(timer))
             @click="setFilter({ service: undefined, operation: undefined, minDurationMs: undefined })">
       Filtreleri temizle
     </button>
+    <RouterLink v-if="filters.service" class="detail-link"
+                :to="{ path: `/${app === 'service' ? 'services' : 'schedulers'}/${encodeURIComponent(filters.service)}`, query: { range: filters.range } }">
+      {{ filters.service }} detayı →
+    </RouterLink>
   </div>
 
   <div v-if="error" class="error-box">{{ error }}</div>
@@ -276,6 +280,7 @@ onUnmounted(() => window.clearInterval(timer))
 .op-select { max-width: 320px; }
 .min-dur { display: flex; align-items: center; gap: 6px; color: var(--text-secondary); }
 .min-dur input { width: 80px; }
+.detail-link { font-size: 13px; }
 .section { margin-top: 16px; }
 .small { font-size: 12px; }
 .count { font-weight: 400; font-size: 13px; margin-left: 6px; }

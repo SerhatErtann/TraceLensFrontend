@@ -234,6 +234,49 @@ export interface Issue {
   lastSeen: string
 }
 
+/** Servis içindeki span grubu türü: metod (Internal span), DB sorgusu, dış HTTP çağrısı */
+export type SpanCategory = 'method' | 'db' | 'call'
+
+export interface SpanGroup {
+  category: SpanCategory
+  name: string
+  /** Dış çağrıda çağrılan servis (span'i yoksa host:port); diğerlerinde boş */
+  target: string
+  count: number
+  avgMs: number
+  p95Ms: number
+  maxMs: number
+  errorCount: number
+  errorRate: number
+  totalMs: number
+  thresholdMs: number
+  callsPerRequest: number
+  /** İsteklerin toplam süresine oranı (0–1) */
+  share: number
+  suspectedNPlusOne: boolean
+}
+
+/** Bir span grubunun tablo/seçim anahtarı (aynı route farklı servislere çağrılabilir) */
+export const spanGroupKey = (g: Pick<SpanGroup, 'category' | 'name' | 'target'>) => `${g.category}|${g.target}|${g.name}`
+
+export interface TimeSplit {
+  category: 'own' | 'call' | 'db' | 'other'
+  totalMs: number
+  share: number
+}
+
+export interface ServiceBreakdown {
+  service: string
+  from: string
+  to: string
+  requestCount: number
+  requestTotalMs: number
+  timeSplit: TimeSplit[]
+  methods: SpanGroup[]
+  database: SpanGroup[]
+  calls: SpanGroup[]
+}
+
 export interface AuthStatus {
   authEnabled: boolean
   authenticated: boolean
@@ -287,6 +330,13 @@ export const api = {
   timeseries: (app: AppKind, f: Filters) => get<TimeBucket[]>(`/${app}/timeseries`, filterParams(f)),
   requests: (app: AppKind, f: Filters, sort: 'time' | 'duration', limit: number, offset: number) =>
     get<PagedResult<RequestRow>>(`/${app}/requests`, { ...filterParams(f), sort, limit, offset }),
+  // Servis Detayı
+  breakdown: (app: AppKind, service: string, range: string) =>
+    get<ServiceBreakdown>(`/${app}/services/${encodeURIComponent(service)}/breakdown`, { range }),
+  /** Bir grubun en yavaş çağrıları; operation alanı çağrının yapıldığı istektir (endpoint/görev) */
+  spanSamples: (app: AppKind, service: string, group: Pick<SpanGroup, 'category' | 'name' | 'target'>, range: string) =>
+    get<RequestRow[]>(`/${app}/services/${encodeURIComponent(service)}/spans`,
+      { range, category: group.category, name: group.name, target: group.target }),
   trace: (traceId: string) => get<TraceDetail>(`/traces/${encodeURIComponent(traceId)}`),
   alerts: (days = 7) => get<{ active: Alert[]; history: Alert[] }>('/alerts', { days }),
   settings: () => get<Settings>('/settings'),

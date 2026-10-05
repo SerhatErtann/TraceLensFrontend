@@ -60,8 +60,9 @@ onUnmounted(() => window.clearInterval(timer))
         <span v-if="openIssues" class="badge" :aria-label="`${openIssues} açık sorun`">{{ openIssues }}</span>
       </RouterLink>
       <div class="sep" role="separator" />
-      <RouterLink to="/services" class="nav-item">Servisler</RouterLink>
-      <RouterLink to="/schedulers" class="nav-item">Görevler</RouterLink>
+      <!-- Detay sayfası (/services/order-service) ayrı bir route; menüde yine Servisler/Görevler seçili görünsün -->
+      <RouterLink to="/services" class="nav-item" :class="{ 'router-link-active': route.path.startsWith('/services/') }">Servisler</RouterLink>
+      <RouterLink to="/schedulers" class="nav-item" :class="{ 'router-link-active': route.path.startsWith('/schedulers/') }">Görevler</RouterLink>
       <RouterLink to="/alerts" class="nav-item">
         Alarmlar
         <span v-if="activeAlerts" class="badge" :aria-label="`${activeAlerts} aktif alarm`">{{ activeAlerts }}</span>

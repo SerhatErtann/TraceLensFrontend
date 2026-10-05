@@ -75,7 +75,7 @@ async function load() {
 const setRange = (r: string) => router.replace({ query: { ...route.query, range: r } })
 
 function openService(s: ServiceCard) {
-  router.push({ path: s.app === 'Service' ? '/services' : '/schedulers', query: { range: range.value, service: s.service } })
+  router.push({ path: `${s.app === 'Service' ? '/services' : '/schedulers'}/${encodeURIComponent(s.service)}`, query: { range: range.value } })
 }
 
 // Listedeki bir endpoint/job'a tıklanınca o operasyona filtrelenmiş sayfa açılır
@@ -112,7 +112,7 @@ onUnmounted(() => window.clearInterval(timer))
   <header class="page-header">
     <div>
       <h1>Genel Bakış</h1>
-      <p class="muted sub">Tüm servisler ve zamanlanmış görevler. Bir karta tıklayınca o uygulamanın endpoint'leri ve istekleri açılır.</p>
+      <p class="muted sub">Tüm servisler ve zamanlanmış görevler. Bir karta tıklayınca o uygulamanın detayı açılır: süre nereye gidiyor, hangi endpoint, metod, sorgu veya çağrı yavaş.</p>
     </div>
     <div class="head-right">
       <div class="segmented" role="group" aria-label="Zaman aralığı">

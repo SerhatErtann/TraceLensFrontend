@@ -24,6 +24,7 @@ Durdurmak için terminalde Ctrl+C.
 | Sorunlar | `/issues` | Sadece ortalaması eşiği aşanlar ve hata oranı %5'i geçenler, nedeniyle (en sık hata dahil). Filtre: alarm açık / yavaş / hatalı / servis. Satıra tıklayınca en kötü örneğin trace'i açılır |
 | Servisler | `/services` | Gelen HTTP istekleri: özet kutuları, ortalama/p95 grafiği (eşik çizgisiyle), endpoint tablosu (eşik ✎ ile yerinde düzenlenir), istek listesi (hatalı satırlar kırmızı, eşiği aşanlar turuncu şeritli) |
 | Görevler | `/schedulers` | Aynı ekran, zamanlanmış görev (scheduler) çalışmaları için |
+| Servis Detayı | `/services/:service`, `/schedulers/:service` | Genel Bakış kartından açılır. Özet kutuları, "Süre nereye gidiyor?" (kendi kodu / başka servislere çağrılar / veritabanı), süre grafiği; sekmeler: Endpoint'ler (Görevler), Metodlar, DB sorguları (N+1 şüphesi işaretli), Dış çağrılar. Satıra tıklayınca en yavaş 10 örnek ve trace linkleri |
 | Trace detayı | `/traces/:traceId` | Waterfall (servis renkleri, kendi süresi, aç/kapa), "Nereye bakmalı?" ipuçları, attribute'lar, exception stack trace |
 | Alarmlar | `/alerts` | Açık ve kapanan alarmlar, test bildirimi butonu |
 | Ayarlar | `/settings` | Varsayılan eşik, özel eşiklerin listesi (düzenle/kaldır), alarm ayarlarının özeti |
@@ -42,9 +43,9 @@ src/
 ├─ router.ts
 ├─ styles.css        Renk token'ları (açık/koyu tema)
 ├─ ranges.ts         Ortak zaman aralığı seçenekleri
-├─ views/            HomeView (Genel Bakış), IssuesView (Sorunlar), OverviewView (Services + Schedulers),
+├─ views/            HomeView (Genel Bakış), IssuesView (Sorunlar), OverviewView (Services + Schedulers), ServiceDetailView,
 │                    TraceView, AlertsView, SettingsView, LoginView
-└─ components/       KpiTile, TrendSpark, LatencyChart, OperationsTable, RequestsTable, StatTiles,
+└─ components/       KpiTile, TrendSpark, LatencyChart, OperationsTable, SpanGroupsTable, RequestsTable, StatTiles,
                      StatusBadge, ThresholdCell, Waterfall
 ```
 

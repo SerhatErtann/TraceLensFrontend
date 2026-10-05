@@ -3,6 +3,7 @@ import { auth, refreshAuth } from './auth'
 import HomeView from './views/HomeView.vue'
 import IssuesView from './views/IssuesView.vue'
 import OverviewView from './views/OverviewView.vue'
+import ServiceDetailView from './views/ServiceDetailView.vue'
 import TraceView from './views/TraceView.vue'
 import AlertsView from './views/AlertsView.vue'
 import SettingsView from './views/SettingsView.vue'
@@ -19,6 +20,8 @@ export const router = createRouter({
     { path: '/issues', component: IssuesView },
     { path: '/services', component: OverviewView, props: { app: 'service' } },
     { path: '/schedulers', component: OverviewView, props: { app: 'scheduler' } },
+    { path: '/services/:service', component: ServiceDetailView, props: r => ({ app: 'service', service: r.params.service }) },
+    { path: '/schedulers/:service', component: ServiceDetailView, props: r => ({ app: 'scheduler', service: r.params.service }) },
     { path: '/traces/:traceId', component: TraceView, props: true },
     { path: '/alerts', component: AlertsView },
     { path: '/settings', component: SettingsView }
