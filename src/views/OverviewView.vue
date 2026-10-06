@@ -3,7 +3,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api, thresholdKey, type AppKind, type Filters, type Histogram, type OperationSummary, type Outcome, type PagedResult,
   type RequestRow, type ThresholdList, type TimeBucket } from '../api'
-import { formatDateTime, formatInt, formatTime } from '../format'
+import { formatDateTime, formatInt, formatMs, formatTime } from '../format'
 import { shiftBuckets } from '../ranges'
 import { useTimeRange } from '../timeRange'
 import { listInsights } from '../insights'
@@ -21,6 +21,14 @@ const route = useRoute()
 const router = useRouter()
 
 const PAGE_SIZE = 25
+// "Süresi en az" çipleri (ms); boş = filtre yok
+const MIN_DURATIONS = [
+  { value: '', label: 'Hepsi' },
+  { value: '100', label: '≥ 100 ms' },
+  { value: '200', label: '≥ 200 ms' },
+  { value: '500', label: '≥ 500 ms' },
+  { value: '1000', label: '≥ 1 s' }
+]
 
 // Zaman aralığı: hazır aralık ya da özel tarih/saat (RangePicker)
 const time = useTimeRange()
@@ -208,39 +216,66 @@ onUnmounted(() => window.clearInterval(timer))
       <h1>{{ title }}</h1>
       <p class="muted sub">{{ subtitle }}</p>
     </div>
-    <label class="refresh muted">
-      <input v-model="autoRefresh" type="checkbox" /> 30 sn'de bir yenile
-      <span v-if="lastLoaded"> · {{ lastLoaded.toLocaleTimeString('tr-TR') }}</span>
-    </label>
   </header>
 
-  <div class="filters">
-    <RangePicker />
-    <select :value="filters.service ?? ''" :aria-label="app === 'service' ? 'Servis' : 'Uygulama'"
-            @change="setFilter({ service: ($event.target as HTMLSelectElement).value, operation: undefined })">
-      <option value="">Tüm {{ app === 'service' ? 'servisler' : 'uygulamalar' }}</option>
-      <option v-for="s in services" :key="s" :value="s">{{ s }}</option>
-    </select>
-    <select :value="filters.operation ?? ''" aria-label="Operasyon" class="op-select"
-            @change="setFilter({ operation: ($event.target as HTMLSelectElement).value })">
-      <option value="">Tüm {{ app === 'service' ? "endpoint'ler" : 'görevler' }}</option>
-      <option v-for="o in operationOptions" :key="o" :value="o">{{ o }}</option>
-    </select>
-    <label class="min-dur">
-      Min süre
-      <input type="number" min="0" step="50" placeholder="ms" :value="filters.minDurationMs"
-             @change="setFilter({ minDurationMs: ($event.target as HTMLInputElement).value || undefined })" />
-      ms
-    </label>
-    <button v-if="filters.service || filters.operation || filters.minDurationMs" class="btn"
-            @click="setFilter({ service: undefined, operation: undefined, minDurationMs: undefined })">
-      Filtreleri temizle
-    </button>
-    <RouterLink v-if="filters.service" class="detail-link"
-                :to="{ path: `/${app === 'service' ? 'services' : 'schedulers'}/${encodeURIComponent(filters.service)}`, query: time.query.value }">
-      {{ filters.service }} detayı →
-    </RouterLink>
-  </div>
+  <section class="card filter-card" aria-label="Filtreler">
+    <div class="filter-row">
+      <RangePicker />
+      <span class="spacer" />
+      <label class="check-chip" title="Sayfa 30 saniyede bir kendini yeniler">
+        <input v-model="autoRefresh" type="checkbox" /> Otomatik yenile
+      </label>
+      <span v-if="lastLoaded" class="muted small">{{ lastLoaded.toLocaleTimeString('tr-TR') }}</span>
+    </div>
+
+    <div class="filter-groups">
+      <div class="filter-group">
+        <span class="filter-label">{{ app === 'service' ? 'Servis' : 'Uygulama' }}</span>
+        <select :value="filters.service ?? ''" :aria-label="app === 'service' ? 'Servis' : 'Uygulama'"
+                @change="setFilter({ service: ($event.target as HTMLSelectElement).value, operation: undefined })">
+          <option value="">Tümü</option>
+          <option v-for="s in services" :key="s" :value="s">{{ s }}</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <span class="filter-label">{{ app === 'service' ? 'Endpoint' : 'Görev' }}</span>
+        <select :value="filters.operation ?? ''" aria-label="Operasyon" class="op-select"
+                @change="setFilter({ operation: ($event.target as HTMLSelectElement).value })">
+          <option value="">Tümü</option>
+          <option v-for="o in operationOptions" :key="o" :value="o">{{ o }}</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <span class="filter-label">Süresi en az</span>
+        <div class="chips">
+          <button v-for="m in MIN_DURATIONS" :key="m.value" type="button" class="chip"
+                  :aria-pressed="String(filters.minDurationMs ?? '') === m.value"
+                  @click="setFilter({ minDurationMs: m.value || undefined })">{{ m.label }}</button>
+          <input class="chip-input" type="number" min="0" step="any" placeholder="özel ms" aria-label="Süresi en az (ms)"
+                 :value="MIN_DURATIONS.some(m => m.value === String(filters.minDurationMs ?? '')) ? '' : filters.minDurationMs"
+                 @change="setFilter({ minDurationMs: ($event.target as HTMLInputElement).value || undefined })" />
+        </div>
+      </div>
+    </div>
+
+    <div v-if="filters.service || filters.operation || filters.minDurationMs" class="filter-applied">
+      <span class="muted">Uygulanan:</span>
+      <span v-if="filters.service" class="pill">{{ filters.service }}
+        <button type="button" aria-label="Servis filtresini kaldır" @click="setFilter({ service: undefined, operation: undefined })">✕</button>
+      </span>
+      <span v-if="filters.operation" class="pill mono-pill">{{ filters.operation }}
+        <button type="button" aria-label="Operasyon filtresini kaldır" @click="setFilter({ operation: undefined })">✕</button>
+      </span>
+      <span v-if="filters.minDurationMs" class="pill">Süresi ≥ {{ formatMs(filters.minDurationMs) }}
+        <button type="button" aria-label="Süre filtresini kaldır" @click="setFilter({ minDurationMs: undefined })">✕</button>
+      </span>
+      <button type="button" class="btn-link" @click="setFilter({ service: undefined, operation: undefined, minDurationMs: undefined })">Tümünü temizle</button>
+      <RouterLink v-if="filters.service" class="detail-link"
+                  :to="{ path: `/${app === 'service' ? 'services' : 'schedulers'}/${encodeURIComponent(filters.service)}`, query: time.query.value }">
+        {{ filters.service }} detayı →
+      </RouterLink>
+    </div>
+  </section>
 
   <div v-if="error" class="error-box">{{ error }}</div>
 
@@ -289,7 +324,7 @@ onUnmounted(() => window.clearInterval(timer))
         <span v-if="requests" class="muted count">{{ formatInt(requests.total) }}</span>
       </h2>
       <div class="list-controls">
-        <span v-if="requestWindow" class="window-chip">
+        <span v-if="requestWindow" class="pill">
           Grafikten seçilen: {{ windowLabel }}
           <button type="button" aria-label="Zaman aralığı seçimini kaldır" @click="setFilter({ windowFrom: undefined, windowTo: undefined })">✕</button>
         </span>
@@ -319,29 +354,10 @@ onUnmounted(() => window.clearInterval(timer))
   margin-bottom: 16px;
 }
 .sub { margin: 2px 0 0; }
-.refresh { font-size: 12px; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
-.filters {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 16px;
-}
-.op-select { max-width: 320px; }
-.min-dur { display: flex; align-items: center; gap: 6px; color: var(--text-secondary); }
-.min-dur input { width: 80px; }
-.detail-link { font-size: 13px; }
-.window-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 2px 4px 2px 10px;
-  border-radius: 999px;
-  background: var(--accent-soft);
-  font-size: 12.5px;
-}
-.window-chip button { border: none; background: none; cursor: pointer; padding: 0 6px; color: var(--text-secondary); font-size: 12px; }
-.window-chip button:hover { color: var(--text-primary); }
+.spacer { flex: 1; }
+.op-select { max-width: 360px; }
+.detail-link { font-size: 13px; margin-left: auto; }
+.mono-pill { font-family: var(--mono); font-size: 12px; }
 .section { margin-top: 16px; }
 .small { font-size: 12px; }
 .count { font-weight: 400; font-size: 13px; margin-left: 6px; }

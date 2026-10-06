@@ -8,6 +8,23 @@ const route = useRoute()
 const router = useRouter()
 const isLoginPage = computed(() => route.path === '/login')
 
+// Menü: iki grup (genel bakış sayfaları / uygulama bazlı sayfalar), her öğe 16px çizgi ikonla
+const NAV = [
+  [
+    { to: '/overview', label: 'Genel Bakış', icon: 'M2.5 2.5h4.5v4.5H2.5zM9 2.5h4.5v4.5H9zM2.5 9h4.5v4.5H2.5zM9 9h4.5v4.5H9z' },
+    { to: '/issues', label: 'Sorunlar', icon: 'M8 2l6.5 11.5h-13zM8 6.5v3M8 11.5v.1' },
+    { to: '/live', label: 'Canlı', icon: 'M1.5 8h3l1.5-4 3 8 1.5-4h4' },
+    { to: '/map', label: 'Servis haritası', icon: 'M4 4.5a1.5 1.5 0 1 0 0-.01M12 4a1.5 1.5 0 1 0 0-.01M8 12a1.5 1.5 0 1 0 0-.01M5.2 5.3l2 5M10.8 5.3l-2 5M5.5 4h5' },
+    { to: '/reports', label: 'Raporlar', icon: 'M2.5 13.5h11M4 11V8M7 11V4.5M10 11V7M13 11V3' }
+  ],
+  [
+    { to: '/services', label: 'Servisler', icon: 'M2.5 3h11v4h-11zM2.5 9h11v4h-11zM5 5h.1M5 11h.1' },
+    { to: '/schedulers', label: 'Görevler', icon: 'M8 2.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 1 0 0-11M8 5v3l2 1.5' },
+    { to: '/alerts', label: 'Alarmlar', icon: 'M4 11.5V7a4 4 0 0 1 8 0v4.5l1 1H3zM6.5 14h3' },
+    { to: '/settings', label: 'Ayarlar', icon: 'M2.5 4.5h7M12 4.5h1.5M2.5 11.5h1.5M6.5 11.5h7M10.5 3v3M5 10v3' }
+  ]
+]
+
 const activeAlerts = ref(0)
 const openIssues = ref(0)
 let timer: number | undefined
@@ -54,23 +71,18 @@ onUnmounted(() => window.clearInterval(timer))
         </svg>
         TraceLens
       </div>
-      <RouterLink to="/overview" class="nav-item">Genel Bakış</RouterLink>
-      <RouterLink to="/issues" class="nav-item">
-        Sorunlar
-        <span v-if="openIssues" class="badge" :aria-label="`${openIssues} açık sorun`">{{ openIssues }}</span>
-      </RouterLink>
-      <RouterLink to="/live" class="nav-item">Canlı <span class="live-dot" aria-hidden="true" /></RouterLink>
-      <RouterLink to="/map" class="nav-item">Servis haritası</RouterLink>
-      <RouterLink to="/reports" class="nav-item">Raporlar</RouterLink>
-      <div class="sep" role="separator" />
-      <!-- Detay sayfası (/services/order-service) ayrı bir route; menüde yine Servisler/Görevler seçili görünsün -->
-      <RouterLink to="/services" class="nav-item" :class="{ 'router-link-active': route.path.startsWith('/services/') }">Servisler</RouterLink>
-      <RouterLink to="/schedulers" class="nav-item" :class="{ 'router-link-active': route.path.startsWith('/schedulers/') }">Görevler</RouterLink>
-      <RouterLink to="/alerts" class="nav-item">
-        Alarmlar
-        <span v-if="activeAlerts" class="badge" :aria-label="`${activeAlerts} aktif alarm`">{{ activeAlerts }}</span>
-      </RouterLink>
-      <RouterLink to="/settings" class="nav-item">Ayarlar</RouterLink>
+      <template v-for="group in NAV" :key="group[0].to">
+        <div v-if="group !== NAV[0]" class="sep" role="separator" />
+        <!-- Detay sayfası (/services/order-service) ayrı bir route; menüde yine Servisler/Görevler seçili görünsün -->
+        <RouterLink v-for="item in group" :key="item.to" :to="item.to" class="nav-item"
+                    :class="{ 'router-link-active': route.path.startsWith(`${item.to}/`) }">
+          <svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path :d="item.icon" /></svg>
+          <span class="label">{{ item.label }}</span>
+          <span v-if="item.to === '/issues' && openIssues" class="badge" :aria-label="`${openIssues} açık sorun`">{{ openIssues }}</span>
+          <span v-if="item.to === '/alerts' && activeAlerts" class="badge" :aria-label="`${activeAlerts} aktif alarm`">{{ activeAlerts }}</span>
+          <span v-if="item.to === '/live'" class="live-dot" aria-hidden="true" />
+        </RouterLink>
+      </template>
       <div v-if="auth.authEnabled && auth.authenticated" class="user">
         <span class="muted" :title="`Oturum: ${auth.username}`">{{ auth.username }}</span>
         <button class="btn small" @click="logout">Çıkış</button>
@@ -111,14 +123,20 @@ onUnmounted(() => window.clearInterval(timer))
 .nav-item {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 10px;
   padding: 7px 10px;
-  border-radius: 6px;
+  border-radius: 8px;
   color: var(--text-secondary);
   font-weight: 500;
+  transition: background 0.12s, color 0.12s;
 }
-.nav-item:hover { background: var(--surface-2); text-decoration: none; }
-.nav-item.router-link-active { background: var(--accent-soft); color: var(--text-primary); }
+.nav-item .label { flex: 1; }
+.nav-item:hover { background: var(--surface-2); color: var(--text-primary); text-decoration: none; }
+.nav-item.router-link-active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.ico { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; opacity: 0.85; }
+.nav-item.router-link-active .ico { opacity: 1; }
+@media (max-width: 760px) { .nav-item .label { flex: none; } }
+@media (prefers-reduced-motion: reduce) { .nav-item { transition: none; } }
 .sep { height: 1px; background: var(--border); margin: 8px 6px; }
 @media (max-width: 760px) { .sep { display: none; } }
 .user {

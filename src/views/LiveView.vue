@@ -15,6 +15,7 @@ const router = useRouter()
 
 const POLL_MS = 2000
 const MAX_ROWS = 100
+const APPS = [{ value: '', label: 'Tümü' }, { value: 'service', label: 'Servis' }, { value: 'scheduler', label: 'Görev' }]
 const FRESH_MS = 2500
 
 // Filtreler URL'de: link paylaşılınca aynı akış açılır
@@ -176,19 +177,25 @@ onUnmounted(() => {
     </div>
   </header>
 
-  <div class="filters">
-    <select :value="app ?? ''" aria-label="Uygulama türü"
-            @change="setQuery({ app: ($event.target as HTMLSelectElement).value || undefined, service: undefined })">
-      <option value="">Servisler ve görevler</option>
-      <option value="service">Sadece servisler</option>
-      <option value="scheduler">Sadece görevler</option>
-    </select>
-    <select :value="service ?? ''" aria-label="Uygulama"
-            @change="setQuery({ service: ($event.target as HTMLSelectElement).value || undefined })">
-      <option value="">Tüm uygulamalar</option>
-      <option v-for="s in services" :key="s" :value="s">{{ s }}</option>
-    </select>
-  </div>
+  <section class="card filter-card" aria-label="Filtreler">
+    <div class="filter-groups">
+      <div class="filter-group">
+        <span class="filter-label">Kaynak</span>
+        <div class="segmented" role="group" aria-label="Servis ya da görev">
+          <button v-for="a in APPS" :key="a.value" type="button" :aria-pressed="(app ?? '') === a.value"
+                  @click="setQuery({ app: a.value || undefined, service: undefined })">{{ a.label }}</button>
+        </div>
+      </div>
+      <div class="filter-group">
+        <span class="filter-label">Uygulama</span>
+        <select :value="service ?? ''" aria-label="Uygulama"
+                @change="setQuery({ service: ($event.target as HTMLSelectElement).value || undefined })">
+          <option value="">Tümü</option>
+          <option v-for="s in services" :key="s" :value="s">{{ s }}</option>
+        </select>
+      </div>
+    </div>
+  </section>
 
   <div v-if="error" class="error-box">{{ error }}</div>
 
@@ -248,7 +255,6 @@ onUnmounted(() => {
 .head-right { display: flex; align-items: center; gap: 12px; }
 .small { font-size: 12px; }
 .count { font-weight: 400; font-size: 13px; margin-left: 6px; }
-.filters { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 16px; }
 .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
 .section { margin-top: 16px; scroll-margin-top: 16px; }
 .hint { margin: 0; padding: 0 16px 8px; }

@@ -30,7 +30,7 @@
   --status-critical-soft: #fbe9e9;
   --status-warning-soft: #fdf3dc;
 
-  --radius: 8px;
+  --radius: 12px;
   --font: "Segoe UI", system-ui, -apple-system, sans-serif;
   --mono: "Cascadia Code", Consolas, ui-monospace, monospace;
 }
@@ -89,6 +89,7 @@ h2 { font-size: 15px; font-weight: 600; margin: 0; }
   background: var(--surface-1);
   border: 1px solid var(--border);
   border-radius: var(--radius);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 2px 8px rgb(0 0 0 / 0.03);
   /* Kutulardan bir bölüme inilince başlık ekranın kenarına yapışmasın */
   scroll-margin-top: 16px;
 }
@@ -107,9 +108,59 @@ h2 { font-size: 15px; font-weight: 600; margin: 0; }
 .pair > .card { min-width: 0; }
 @media (max-width: 760px) { .pair { grid-template-columns: minmax(0, 1fr); } }
 
-/* Liste başlığındaki filtre kutuları ("Sadece eşiği aşanlar / Sadece hatalılar") — tüm sayfalarda aynı */
-.list-controls { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; font-size: 13px; }
-.list-controls label { display: flex; align-items: center; gap: 5px; }
+/* Liste başlığındaki filtreler ("Sadece eşiği aşanlar / Sadece hatalılar") — tüm sayfalarda aynı */
+.list-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; }
+
+/* Onay kutulu çip: <label class="check-chip"><input type="checkbox"> Metin</label>. Liste başlıklarındaki
+   onay kutuları da otomatik bu görünümü alır; işaretliyken çip mavi olur. */
+.check-chip,
+.list-controls label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 28px;
+  padding: 0 12px 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-1);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.check-chip:hover,
+.list-controls label:hover { border-color: var(--border-strong); color: var(--text-primary); }
+.check-chip:has(input:checked),
+.list-controls label:has(input:checked) { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.check-chip input,
+.list-controls label input { width: 14px; height: 14px; }
+
+/* Filtre kartı (Alarmlar, Servisler, Canlı): üstte ana seçim, altında etiketli gruplar, en altta uygulanan filtreler */
+.filter-card { display: flex; flex-direction: column; gap: 14px; padding: 16px; margin-bottom: 16px; }
+.filter-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
+.filter-groups { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 14px 28px; }
+.filter-group { display: flex; flex-direction: column; gap: 6px; }
+.filter-label { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-muted); }
+.chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.chip-input { width: 110px; height: 28px !important; border-radius: 999px !important; font-size: 13px; }
+.filter-applied { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 13px; }
+/* Uygulanan filtre: ✕ ile kaldırılır */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 4px 0 10px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--text-primary);
+  font-weight: 500;
+}
+.pill button { border: none; background: none; width: 20px; height: 20px; border-radius: 50%; cursor: pointer; color: var(--text-secondary); font-size: 11px; }
+.pill button:hover { background: var(--surface-1); color: var(--text-primary); }
 
 table.data {
   width: 100%;

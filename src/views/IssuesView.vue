@@ -107,18 +107,22 @@ onUnmounted(() => window.clearInterval(timer))
       <h1>Sorunlar</h1>
       <p class="muted sub">Sadece dikkat isteyenler: ortalaması eşiği aşanlar ve hata oranı %5'i geçenler, en kötüden başlayarak. Satıra tıklayınca en kötü örneği açılır.</p>
     </div>
-    <RangePicker />
   </header>
 
-  <div class="chips">
-    <button v-for="f in FILTERS" :key="f.value" class="chip" :aria-pressed="filter === f.value"
-            @click="setQuery({ filter: f.value === 'all' ? undefined : f.value })">
-      {{ f.label }} · {{ counts[f.value] }}
-    </button>
-    <button v-if="service" class="chip service" @click="setQuery({ service: undefined })" :aria-label="`${service} filtresini kaldır`">
-      Servis: {{ service }} ✕
-    </button>
-  </div>
+  <section class="card filter-card" aria-label="Filtreler">
+    <div class="filter-row">
+      <RangePicker />
+      <div class="segmented" role="group" aria-label="Sorun türü">
+        <button v-for="f in FILTERS" :key="f.value" type="button" :aria-pressed="filter === f.value"
+                @click="setQuery({ filter: f.value === 'all' ? undefined : f.value })">
+          {{ f.label }} <span class="n">{{ counts[f.value] }}</span>
+        </button>
+      </div>
+      <span v-if="service" class="pill">Servis: {{ service }}
+        <button type="button" :aria-label="`${service} filtresini kaldır`" @click="setQuery({ service: undefined })">✕</button>
+      </span>
+    </div>
+  </section>
 
   <div v-if="error" class="error-box">{{ error }}</div>
 
@@ -153,10 +157,8 @@ onUnmounted(() => window.clearInterval(timer))
 <style scoped>
 .page-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
 .sub { margin: 2px 0 0; max-width: 720px; }
-.chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
-.chip { border: 1px solid var(--border-strong); background: var(--surface-1); border-radius: 999px; padding: 3px 12px; cursor: pointer; font-size: 13px; }
-.chip[aria-pressed='true'] { background: var(--text-primary); color: var(--surface-1); border-color: var(--text-primary); }
-.chip.service { background: var(--accent-soft); border-color: var(--accent); }
+/* Sayı rozeti segment düğmesinin içinde */
+.n { display: inline-block; min-width: 18px; margin-left: 4px; padding: 0 5px; border-radius: 9px; background: var(--surface-2); font-size: 11px; font-weight: 600; text-align: center; }
 .issue {
   display: grid;
   grid-template-columns: 4px minmax(0, 1fr) auto;
