@@ -120,6 +120,36 @@ export interface Alert {
   lastCheckedAt: string
   resolvedAt: string | null
   durationMinutes: number
+  /** slow: süre eşiği aşıldı · error: hata oranı sınırı aşıldı */
+  kind: 'slow' | 'error'
+  errorCount: number
+  errorRate: number
+  peakErrorRate: number
+  /** Hata alarmında en sık sonuç: "500", "502", görevlerde hata tipi */
+  topStatus: string
+}
+
+export interface AlertFilters {
+  days?: number
+  from?: string
+  to?: string
+  app?: AppKind
+  service?: string
+  operation?: string
+  kind?: 'slow' | 'error'
+  minPeakMs?: number
+  /** "500" gibi tam kod ya da "5xx" / "4xx" */
+  status?: string
+}
+
+export interface AlertList {
+  from: string
+  to: string
+  active: Alert[]
+  history: Alert[]
+  /** Filtre seçenekleri (aralıktaki alarmlardan) */
+  services: string[]
+  statuses: string[]
 }
 
 export interface Settings {
@@ -505,7 +535,7 @@ export const api = {
     get<RequestRow[]>(`/${app}/services/${encodeURIComponent(service)}/spans`,
       { ...w, category: group.category, name: group.name, target: group.target }),
   trace: (traceId: string) => get<TraceDetail>(`/traces/${encodeURIComponent(traceId)}`),
-  alerts: (days = 7) => get<{ active: Alert[]; history: Alert[] }>('/alerts', { days }),
+  alerts: (filters: AlertFilters = {}) => get<AlertList>('/alerts', { ...filters }),
   settings: () => get<Settings>('/settings'),
   /** Başarılıysa backend'in mesajını döner; başarısızsa Error fırlatır (mesajı hatanın nedeni). */
   testNotification: async () => (await request<BaseResponse>('/alerts/test-notification', { method: 'POST' })).message,

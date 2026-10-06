@@ -29,7 +29,7 @@ Durdurmak için terminalde Ctrl+C.
 | Görevler | `/schedulers` | Aynı ekran, zamanlanmış görev (scheduler) çalışmaları için |
 | Servis Detayı | `/services/:service`, `/schedulers/:service` | Genel Bakış kartından açılır. Özet kutuları, "Süre nereye gidiyor?" (kendi kodu / başka servislere çağrılar / veritabanı), süre grafiği; sekmeler: Endpoint'ler (Görevler), Metodlar, DB sorguları (N+1 şüphesi işaretli), Dış çağrılar. Endpoint seçilince isteğin anatomisi (ortalama bir istekte her adım kaç kez, ne kadar). Satıra tıklayınca en yavaş 10 örnek ve trace linkleri. Süre dağılımı, sonuçlar ve instance'lar |
 | Trace detayı | `/traces/:traceId` | Waterfall (servis renkleri, kendi süresi, aç/kapa), "Nereye bakmalı?" ipuçları, attribute'lar, exception stack trace |
-| Alarmlar | `/alerts` | Açık ve kapanan alarmlar, test bildirimi butonu |
+| Alarmlar | `/alerts` | Yavaşlık ve hata alarmları (açık / kapanan). Filtreler: dönem (24 sa … 90 gün ya da özel tarih-saat), servis/görev, uygulama, alarm türü, hata kodu (500, 5xx…), en yüksek süre ≥ X ms, operasyon arama. "Kısaca" özeti; satıra tıklayınca alarmın açık olduğu aralığın istekleri açılır. Test bildirimi butonu |
 | Ayarlar | `/settings` | Varsayılan eşik, özel eşiklerin listesi (düzenle/kaldır), alarm ayarlarının özeti |
 | Giriş | `/login` | TraceLensService'te şifre tanımlıysa açılır; girişten sonra istenen sayfaya döner. Menüde kullanıcı adı ve Çıkış |
 
