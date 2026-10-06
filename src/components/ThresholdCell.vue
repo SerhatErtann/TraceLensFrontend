@@ -111,7 +111,5 @@ const resetToDefault = () => run(() => api.deleteThreshold(props.service, props.
 .editor { display: flex; align-items: center; gap: 5px; }
 .editor input { width: 86px; padding: 2px 6px; text-align: right; }
 .btn.small { padding: 2px 8px; font-size: 12px; }
-.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-.btn.primary:hover:not(:disabled) { background: var(--accent); filter: brightness(1.08); }
 .error { text-align: right; font-size: 11.5px; color: var(--status-critical); }
 </style>

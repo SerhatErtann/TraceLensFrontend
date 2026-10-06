@@ -30,6 +30,43 @@ const filters = computed<AlertFilters>(() => ({
 }))
 const hasFilters = computed(() => ['app', 'service', 'operation', 'kind', 'minPeakMs', 'status'].some(k => q.value[k]))
 
+const PERIODS = [
+  { value: '1', label: '24 saat' },
+  { value: '7', label: '7 gün' },
+  { value: '30', label: '30 gün' },
+  { value: '90', label: '90 gün' },
+  { value: 'custom', label: 'Özel aralık' }
+]
+const KINDS = [{ value: '', label: 'Tümü' }, { value: 'slow', label: 'Yavaşlık' }, { value: 'error', label: 'Hata' }]
+const APPS = [{ value: '', label: 'Tümü' }, { value: 'service', label: 'Servis' }, { value: 'scheduler', label: 'Görev' }]
+const PEAKS = [
+  { value: '', label: 'Hepsi' },
+  { value: '200', label: '≥ 200 ms' },
+  { value: '500', label: '≥ 500 ms' },
+  { value: '1000', label: '≥ 1 s' },
+  { value: '2000', label: '≥ 2 s' }
+]
+const period = computed(() => (isCustom.value ? 'custom' : q.value.period || '7'))
+// Hata kodu çipleri: sınıflar + bu aralıktaki alarmlarda görülen kodlar
+const statusChips = computed(() => [
+  { value: '', label: 'Hepsi' },
+  { value: '5xx', label: '5xx' },
+  { value: '4xx', label: '4xx' },
+  ...(data.value?.statuses ?? []).map(s => ({ value: s, label: s }))
+])
+
+// Uygulanan filtreler, tek tek kaldırılabilir haplar olarak
+const activeFilters = computed(() => {
+  const list: { key: string; label: string }[] = []
+  if (q.value.kind) list.push({ key: 'kind', label: q.value.kind === 'error' ? 'Hata alarmları' : 'Yavaşlık alarmları' })
+  if (q.value.app) list.push({ key: 'app', label: q.value.app === 'service' ? 'Sadece servisler' : 'Sadece görevler' })
+  if (q.value.service) list.push({ key: 'service', label: q.value.service })
+  if (q.value.minPeakMs) list.push({ key: 'minPeakMs', label: `En yüksek ≥ ${formatMs(Number(q.value.minPeakMs))}` })
+  if (q.value.status) list.push({ key: 'status', label: `Hata kodu ${q.value.status}` })
+  if (q.value.operation) list.push({ key: 'operation', label: `"${q.value.operation}"` })
+  return list
+})
+
 function setQuery(patch: Record<string, string | number | undefined>) {
   const query: Record<string, string> = {}
   for (const [k, v] of Object.entries({ ...route.query, ...patch })) if (v !== undefined && v !== null && v !== '') query[k] = String(v)
@@ -170,50 +207,77 @@ onUnmounted(() => window.clearInterval(timer))
     </div>
   </header>
 
-  <div class="filters">
-    <select :value="isCustom ? 'custom' : (q.period || '7')" aria-label="Dönem" @change="onPeriod(($event.target as HTMLSelectElement).value)">
-      <option value="1">Son 24 saat</option>
-      <option value="7">Son 7 gün</option>
-      <option value="30">Son 30 gün</option>
-      <option value="90">Son 90 gün</option>
-      <option value="custom">Özel aralık…</option>
-    </select>
-    <form v-if="isCustom" class="custom" @submit.prevent="applyCustom">
-      <input v-model="customFrom" type="datetime-local" aria-label="Başlangıç" />
-      <span class="muted">–</span>
-      <input v-model="customTo" type="datetime-local" aria-label="Bitiş" />
-      <button class="btn" type="submit">Uygula</button>
-    </form>
-    <select :value="q.app ?? ''" aria-label="Uygulama türü" @change="setQuery({ app: ($event.target as HTMLSelectElement).value || undefined })">
-      <option value="">Servis ve görev</option>
-      <option value="service">Sadece servisler</option>
-      <option value="scheduler">Sadece görevler</option>
-    </select>
-    <select :value="q.service ?? ''" aria-label="Uygulama" @change="setQuery({ service: ($event.target as HTMLSelectElement).value || undefined })">
-      <option value="">Tüm uygulamalar</option>
-      <option v-for="s in data?.services ?? []" :key="s" :value="s">{{ s }}</option>
-    </select>
-    <select :value="q.kind ?? ''" aria-label="Alarm türü" @change="setQuery({ kind: ($event.target as HTMLSelectElement).value || undefined })">
-      <option value="">Tüm alarmlar</option>
-      <option value="slow">Yavaşlık (süre eşiği)</option>
-      <option value="error">Hata (500 vb.)</option>
-    </select>
-    <select :value="q.status ?? ''" aria-label="Hata kodu" @change="setQuery({ status: ($event.target as HTMLSelectElement).value || undefined })">
-      <option value="">Tüm hata kodları</option>
-      <option value="5xx">5xx (sunucu hatası)</option>
-      <option value="4xx">4xx (istemci hatası)</option>
-      <option v-for="s in data?.statuses ?? []" :key="s" :value="s">{{ s }}</option>
-    </select>
-    <label class="field">
-      En yüksek ≥
-      <input type="number" min="0" step="any" placeholder="ms" :value="q.minPeakMs"
-             @change="setQuery({ minPeakMs: ($event.target as HTMLInputElement).value || undefined })" />
-      ms
-    </label>
-    <input class="search" type="text" placeholder="Operasyon ara (ör. /orders)" :value="q.operation"
-           aria-label="Operasyon ara" @input="onSearch(($event.target as HTMLInputElement).value)" />
-    <button v-if="hasFilters" class="btn" @click="clearFilters">Filtreleri temizle</button>
-  </div>
+  <section class="card filter-card" aria-label="Filtreler">
+    <div class="row">
+      <div class="segmented" role="group" aria-label="Dönem">
+        <button v-for="p in PERIODS" :key="p.value" type="button" :aria-pressed="period === p.value" @click="onPeriod(p.value)">{{ p.label }}</button>
+      </div>
+      <form v-if="isCustom" class="custom" @submit.prevent="applyCustom">
+        <input v-model="customFrom" type="datetime-local" aria-label="Başlangıç" />
+        <span class="muted">–</span>
+        <input v-model="customTo" type="datetime-local" aria-label="Bitiş" />
+        <button class="btn primary" type="submit">Uygula</button>
+      </form>
+      <label class="search-field grow">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5" /><path d="M10.5 10.5L14 14" /></svg>
+        <input type="search" placeholder="Operasyon ara, ör. /orders" :value="q.operation" aria-label="Operasyon ara"
+               @input="onSearch(($event.target as HTMLInputElement).value)" />
+      </label>
+    </div>
+
+    <div class="row groups">
+      <div class="group">
+        <span class="glabel">Alarm türü</span>
+        <div class="segmented" role="group" aria-label="Alarm türü">
+          <button v-for="k in KINDS" :key="k.value" type="button" :aria-pressed="(q.kind ?? '') === k.value"
+                  @click="setQuery({ kind: k.value || undefined })">{{ k.label }}</button>
+        </div>
+      </div>
+      <div class="group">
+        <span class="glabel">Kaynak</span>
+        <div class="segmented" role="group" aria-label="Servis ya da görev">
+          <button v-for="a in APPS" :key="a.value" type="button" :aria-pressed="(q.app ?? '') === a.value"
+                  @click="setQuery({ app: a.value || undefined })">{{ a.label }}</button>
+        </div>
+      </div>
+      <div class="group">
+        <span class="glabel">Uygulama</span>
+        <select :value="q.service ?? ''" aria-label="Uygulama" @change="setQuery({ service: ($event.target as HTMLSelectElement).value || undefined })">
+          <option value="">Tümü</option>
+          <option v-for="s in data?.services ?? []" :key="s" :value="s">{{ s }}</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="row groups">
+      <div class="group">
+        <span class="glabel">En yüksek süre</span>
+        <div class="chips">
+          <button v-for="m in PEAKS" :key="m.value" type="button" class="chip" :aria-pressed="(q.minPeakMs ?? '') === m.value"
+                  @click="setQuery({ minPeakMs: m.value || undefined })">{{ m.label }}</button>
+          <input class="ms-input" type="number" min="0" step="any" placeholder="≥ özel ms" aria-label="En yüksek süre en az (ms)"
+                 :value="PEAKS.some(m => m.value === q.minPeakMs) ? '' : q.minPeakMs"
+                 @change="setQuery({ minPeakMs: ($event.target as HTMLInputElement).value || undefined })" />
+        </div>
+      </div>
+      <div class="group">
+        <span class="glabel">Hata kodu</span>
+        <div class="chips">
+          <button v-for="s in statusChips" :key="s.value" type="button" class="chip" :aria-pressed="(q.status ?? '') === s.value"
+                  @click="setQuery({ status: s.value || undefined })">{{ s.label }}</button>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="activeFilters.length" class="applied">
+      <span class="muted">Uygulanan:</span>
+      <span v-for="f in activeFilters" :key="f.key" class="pill">
+        {{ f.label }}
+        <button type="button" :aria-label="`${f.label} filtresini kaldır`" @click="setQuery({ [f.key]: undefined })">✕</button>
+      </span>
+      <button type="button" class="btn-link" @click="clearFilters">Tümünü temizle</button>
+    </div>
+  </section>
 
   <div v-if="error" class="error-box">{{ error }}</div>
 
@@ -306,19 +370,30 @@ onUnmounted(() => window.clearInterval(timer))
 .sub { margin: 4px 0 0; max-width: 720px; }
 .notify { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 13px; }
 .notify code { font-family: var(--mono); font-size: 12px; }
-.filters { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 16px; }
+/* Filtre kartı: üstte dönem + arama, altında etiketli gruplar, en altta uygulanan filtreler */
+.filter-card { display: flex; flex-direction: column; gap: 14px; padding: 16px; margin-bottom: 16px; }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
+.groups { gap: 14px 28px; align-items: flex-start; }
+.group { display: flex; flex-direction: column; gap: 6px; }
+.glabel { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-muted); }
+.chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.grow { flex: 1; min-width: 220px; }
 .custom { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.custom input, .search {
-  font: inherit;
-  color: inherit;
-  background: var(--surface-1);
-  border: 1px solid var(--border-strong);
-  border-radius: 6px;
-  padding: 5px 8px;
+.ms-input { width: 110px; height: 28px !important; border-radius: 999px !important; font-size: 13px; }
+.applied { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 13px; }
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 4px 0 10px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--text-primary);
+  font-weight: 500;
 }
-.search { min-width: 200px; }
-.field { display: flex; align-items: center; gap: 6px; color: var(--text-secondary); }
-.field input { width: 80px; }
+.pill button { border: none; background: none; width: 20px; height: 20px; border-radius: 50%; cursor: pointer; color: var(--text-secondary); font-size: 11px; }
+.pill button:hover { background: var(--surface-1); color: var(--text-primary); }
 .section { margin-top: 16px; }
 .small { font-size: 12px; }
 .count { font-weight: 400; font-size: 13px; margin-left: 6px; }

@@ -126,7 +126,6 @@ onMounted(load)
 .default-form p { margin: 0 0 10px; }
 .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .row input { width: 110px; text-align: right; }
-.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 .btn.small { padding: 2px 10px; font-size: 12px; }
 .facts { display: flex; flex-wrap: wrap; gap: 8px 32px; margin: 0; padding: 0 16px 8px; }
 .facts dt { font-size: 11.5px; color: var(--text-muted); }

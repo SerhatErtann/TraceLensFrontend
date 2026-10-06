@@ -65,10 +65,6 @@ watch(() => win.value.range, () => { open.value = false })
 
 <style scoped>
 .range-picker { position: relative; }
-.segmented { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--border-strong); border-radius: 6px; overflow: hidden; background: var(--surface-1); }
-.segmented button { border: none; background: transparent; padding: 5px 12px; cursor: pointer; border-right: 1px solid var(--border); white-space: nowrap; }
-.segmented button:last-child { border-right: none; }
-.segmented button.active { background: var(--accent); color: #fff; }
 .panel {
   position: absolute;
   z-index: 20;
@@ -83,16 +79,7 @@ watch(() => win.value.range, () => { open.value = false })
   box-shadow: 0 8px 24px rgb(0 0 0 / 0.14);
 }
 .panel label { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; color: var(--text-secondary); }
-.panel input {
-  font: inherit;
-  color: inherit;
-  background: var(--surface-1);
-  border: 1px solid var(--border-strong);
-  border-radius: 6px;
-  padding: 5px 8px;
-}
 .actions { display: flex; gap: 8px; }
-.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 .err { margin: 0; color: var(--status-critical); font-size: 12.5px; }
 .note { margin: 0; font-size: 11.5px; }
 @media (max-width: 760px) { .panel { left: 0; right: auto; } }
