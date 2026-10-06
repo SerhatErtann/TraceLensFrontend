@@ -336,6 +336,19 @@ export interface Report {
   }
 }
 
+export interface AssistantMessage {
+  role: 'user' | 'assistant'
+  content: string
+}
+
+export interface AssistantReply {
+  /** Markdown: **kalın**, madde listesi, /services/... gibi dashboard içi linkler */
+  answer: string
+  /** Cevap için bakılan veriler ("Sorunlar incelendi") */
+  steps: string[]
+  model: string
+}
+
 export interface LiveRow extends RequestRow {
   app: 'Service' | 'Scheduler'
 }
@@ -524,6 +537,10 @@ export const api = {
   serviceMap: (w: TimeWindow) => get<ServiceMap>('/service-map', { ...w }),
   live: (params: LiveParams) => get<Live>('/live', { ...params }),
   report: (period: ReportPeriod, from?: string, to?: string) => get<Report>('/reports', { period, from, to }),
+
+  // AI asistanı (Claude); sohbet istemcide tutulur, her soruda tamamı gönderilir
+  assistantStatus: () => get<{ enabled: boolean; model: string }>('/assistant/status'),
+  assistantChat: (messages: AssistantMessage[]) => send<AssistantReply>('POST', '/assistant/chat', { messages }),
 
   // Servis Detayı
   anatomy: (app: AppKind, service: string, operation: string, w: TimeWindow) =>

@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from './api'
 import { auth, markLoggedOut } from './auth'
+import AssistantWidget from './components/AssistantWidget.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -91,6 +92,7 @@ onUnmounted(() => window.clearInterval(timer))
     <main class="content">
       <RouterView />
     </main>
+    <AssistantWidget v-if="auth.loaded && (!auth.authEnabled || auth.authenticated)" />
   </div>
 </template>
 

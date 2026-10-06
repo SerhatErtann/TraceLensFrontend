@@ -31,6 +31,7 @@ Durdurmak için terminalde Ctrl+C.
 | Trace detayı | `/traces/:traceId` | Waterfall (servis renkleri, kendi süresi, aç/kapa), "Nereye bakmalı?" ipuçları, attribute'lar, exception stack trace |
 | Alarmlar | `/alerts` | Yavaşlık ve hata alarmları (açık / kapanan). Filtreler: dönem (24 sa … 90 gün ya da özel tarih-saat), servis/görev, uygulama, alarm türü, hata kodu (500, 5xx…), en yüksek süre ≥ X ms, operasyon arama. "Kısaca" özeti; satıra tıklayınca alarmın açık olduğu aralığın istekleri açılır. Test bildirimi butonu |
 | Ayarlar | `/settings` | Varsayılan eşik, özel eşiklerin listesi (düzenle/kaldır), alarm ayarlarının özeti |
+| AI asistanı | (her sayfada sağ altta) | Gözlü buton; Türkçe soru sorulur, Claude veriye bakıp cevaplar. Öneri soruları, cevapta hangi verilere bakıldığı, dashboard linkleri (sayfayı açar). Sohbet sekme kapanana kadar kalır; "+" yeni sohbet. API anahtarı yoksa nasıl açılacağını söyler (bkz. tracelens-service README "AI asistanı") |
 | Giriş | `/login` | TraceLensService'te şifre tanımlıysa açılır; girişten sonra istenen sayfaya döner. Menüde kullanıcı adı ve Çıkış |
 
 Oturum düşerse (API 401 döner) bulunulan sayfaya geri dönecek şekilde giriş ekranı açılır (`src/auth.ts`, `router.ts`).
@@ -45,6 +46,7 @@ Her sayfanın başında "Kısaca" kutusu veriyi düz cümlelerle özetler (insig
 src/
 ├─ api.ts            Backend sözleşmesi (tipler + fetch). Yanıtlar { isSuccess, message, data } formatında
 ├─ format.ts         ms / byte / tarih biçimlendirme
+├─ markdown.ts       Asistan cevapları için güvenli, küçük markdown (HTML kaçışlanır; yalnızca dashboard içi linkler)
 ├─ router.ts
 ├─ styles.css        Renk token'ları (açık/koyu tema)
 ├─ ranges.ts         Ortak zaman aralığı seçenekleri
@@ -52,7 +54,7 @@ src/
 │                    TraceView, AlertsView, SettingsView, LoginView
 └─ components/       KpiTile, TrendSpark, LatencyChart, OperationsTable, SpanGroupsTable, RequestsTable, StatTiles, DurationHistogram,
                      OutcomeBreakdown, InstancesTable, RequestAnatomy, TimeSplitBar,
-                     StatusBadge, ThresholdCell, Waterfall
+                     StatusBadge, ThresholdCell, Waterfall, AssistantWidget (sağ alttaki AI asistanı)
 ```
 
 ## Komutlar
