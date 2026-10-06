@@ -36,7 +36,7 @@ export const router = createRouter({
   scrollBehavior: (to, from) => (to.path !== from.path ? { top: 0 } : false)
 })
 
-// Giriş açıksa ve oturum yoksa giriş sayfasına; girişten sonra gidilmek istenen sayfaya dönülür.
+// Oturum yoksa giriş sayfasına; girişten sonra gidilmek istenen sayfaya dönülür.
 router.beforeEach(async to => {
   if (!auth.loaded) {
     try {
@@ -48,7 +48,7 @@ router.beforeEach(async to => {
   if (to.meta.public) {
     return to.path === '/login' && auth.authenticated ? HOME : true
   }
-  if (auth.authEnabled && !auth.authenticated) {
+  if (!auth.authenticated) {
     return { path: '/login', query: { redirect: to.fullPath } }
   }
   return true

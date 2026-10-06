@@ -478,9 +478,18 @@ export interface ServiceBreakdown {
 }
 
 export interface AuthStatus {
-  authEnabled: boolean
   authenticated: boolean
   username: string | null
+  /** Hiç kullanıcı yok: giriş sayfası "ilk hesabı oluştur" ekranını gösterir */
+  setupRequired: boolean
+  /** Giriş sayfasında "Kayıt ol" seçeneği var mı */
+  registrationOpen: boolean
+}
+
+export interface DashboardUser {
+  username: string
+  createdAt: string
+  isMe: boolean
 }
 
 const BASE = '/api/v1'
@@ -568,5 +577,14 @@ export const api = {
   // Giriş
   authStatus: () => get<AuthStatus>('/auth/me'),
   login: (username: string, password: string) => send<AuthStatus>('POST', '/auth/login', { username, password }),
-  logout: async () => { await request<BaseResponse>('/auth/logout', { method: 'POST' }) }
+  register: (username: string, password: string) => send<AuthStatus>('POST', '/auth/register', { username, password }),
+  logout: async () => { await request<BaseResponse>('/auth/logout', { method: 'POST' }) },
+  changePassword: async (currentPassword: string, newPassword: string) => {
+    await send<null>('PUT', '/auth/password', { currentPassword, newPassword })
+  },
+
+  // Kullanıcılar: her işlem güncel listenin tamamını döner
+  users: () => get<DashboardUser[]>('/users'),
+  addUser: (username: string, password: string) => send<DashboardUser[]>('POST', '/users', { username, password }),
+  deleteUser: (username: string) => send<DashboardUser[]>('DELETE', `/users/${encodeURIComponent(username)}`)
 }

@@ -4,6 +4,7 @@ import { api, type Settings, type ThresholdList, type ThresholdOverride } from '
 import { formatDateTime, formatMs } from '../format'
 import StatusBadge from '../components/StatusBadge.vue'
 import ThresholdCell from '../components/ThresholdCell.vue'
+import UsersSettings from '../components/UsersSettings.vue'
 
 const thresholds = ref<ThresholdList | null>(null)
 const settings = ref<Settings | null>(null)
@@ -53,7 +54,7 @@ onMounted(load)
 <template>
   <header class="page-header">
     <h1>Ayarlar</h1>
-    <p class="muted sub">Eşikler kaydedildiği anda geçerli olur: grafikler, "eşiği aşan" sayıları ve alarmlar yeni değere göre hesaplanır.</p>
+    <p class="muted sub">Eşikler kaydedildiği anda geçerli olur: grafikler, "eşiği aşan" sayıları ve alarmlar yeni değere göre hesaplanır. En altta kullanıcılar ve şifre değiştirme.</p>
   </header>
 
   <div v-if="error" class="error-box">{{ error }}</div>
@@ -113,6 +114,8 @@ onMounted(load)
     </dl>
     <p class="muted note">Bu değerler TraceLensService'in <code>Config/appsettings.json</code> dosyasındaki "Alerts" ve "Notifications" bölümlerinden gelir.</p>
   </section>
+
+  <UsersSettings />
 </template>
 
 <style scoped>

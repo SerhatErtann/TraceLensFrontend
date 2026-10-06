@@ -4,9 +4,10 @@ import { api, type AuthStatus } from './api'
 /** Oturum durumu; router guard ve menü buradan okur. */
 export const auth = reactive<AuthStatus & { loaded: boolean }>({
   loaded: false,
-  authEnabled: false,
   authenticated: false,
-  username: null
+  username: null,
+  setupRequired: false,
+  registrationOpen: false
 })
 
 export async function refreshAuth() {

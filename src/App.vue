@@ -32,7 +32,7 @@ let timer: number | undefined
 
 async function refreshAlerts() {
   // Oturum durumu öğrenilmeden istek atılmaz; aksi halde 401 erken yönlendirmeye yol açar.
-  if (!auth.loaded || isLoginPage.value || (auth.authEnabled && !auth.authenticated)) return
+  if (!auth.loaded || isLoginPage.value || !auth.authenticated) return
   try {
     // Rozetler, sayfaların varsayılan aralığıyla (son 1 saat) aynı sayıyı gösterir
     const [alerts, issues] = await Promise.all([api.alerts(), api.issues({ range: '1h' })])
@@ -65,13 +65,13 @@ onUnmounted(() => window.clearInterval(timer))
   <RouterView v-if="isLoginPage" />
   <div v-else class="shell">
     <nav class="sidebar">
-      <div class="brand">
+      <RouterLink to="/overview" class="brand" title="Genel Bakış">
         <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
           <path d="M3 12h4l3-8 4 16 3-8h4" fill="none" stroke="currentColor" stroke-width="2.2"
                 stroke-linecap="round" stroke-linejoin="round" />
         </svg>
         TraceLens
-      </div>
+      </RouterLink>
       <template v-for="group in NAV" :key="group[0].to">
         <div v-if="group !== NAV[0]" class="sep" role="separator" />
         <!-- Detay sayfası (/services/order-service) ayrı bir route; menüde yine Servisler/Görevler seçili görünsün -->
@@ -84,7 +84,7 @@ onUnmounted(() => window.clearInterval(timer))
           <span v-if="item.to === '/live'" class="live-dot" aria-hidden="true" />
         </RouterLink>
       </template>
-      <div v-if="auth.authEnabled && auth.authenticated" class="user">
+      <div v-if="auth.authenticated" class="user">
         <span class="muted" :title="`Oturum: ${auth.username}`">{{ auth.username }}</span>
         <button class="btn small" @click="logout">Çıkış</button>
       </div>
@@ -92,7 +92,7 @@ onUnmounted(() => window.clearInterval(timer))
     <main class="content">
       <RouterView />
     </main>
-    <AssistantWidget v-if="auth.loaded && (!auth.authEnabled || auth.authenticated)" />
+    <AssistantWidget v-if="auth.authenticated" />
   </div>
 </template>
 
@@ -121,7 +121,9 @@ onUnmounted(() => window.clearInterval(timer))
   font-size: 16px;
   padding: 4px 10px 18px;
   color: var(--accent);
+  border-radius: 8px;
 }
+.brand:hover { text-decoration: none; }
 .nav-item {
   display: flex;
   align-items: center;

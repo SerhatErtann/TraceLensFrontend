@@ -30,9 +30,9 @@ Durdurmak için terminalde Ctrl+C.
 | Servis Detayı | `/services/:service`, `/schedulers/:service` | Genel Bakış kartından açılır. Özet kutuları, "Süre nereye gidiyor?" (kendi kodu / başka servislere çağrılar / veritabanı), süre grafiği; sekmeler: Endpoint'ler (Görevler), Metodlar, DB sorguları (N+1 şüphesi işaretli), Dış çağrılar. Endpoint seçilince isteğin anatomisi (ortalama bir istekte her adım kaç kez, ne kadar). Satıra tıklayınca en yavaş 10 örnek ve trace linkleri. Süre dağılımı, sonuçlar ve instance'lar |
 | Trace detayı | `/traces/:traceId` | Waterfall (servis renkleri, kendi süresi, aç/kapa), "Nereye bakmalı?" ipuçları, attribute'lar, exception stack trace |
 | Alarmlar | `/alerts` | Yavaşlık ve hata alarmları (açık / kapanan). Filtreler: dönem (24 sa … 90 gün ya da özel tarih-saat), servis/görev, uygulama, alarm türü, hata kodu (500, 5xx…), en yüksek süre ≥ X ms, operasyon arama. "Kısaca" özeti; satıra tıklayınca alarmın açık olduğu aralığın istekleri açılır. Test bildirimi butonu |
-| Ayarlar | `/settings` | Varsayılan eşik, özel eşiklerin listesi (düzenle/kaldır), alarm ayarlarının özeti |
+| Ayarlar | `/settings` | Varsayılan eşik, özel eşiklerin listesi (düzenle/kaldır), alarm ayarlarının özeti, kullanıcılar (ekle/sil) ve şifre değiştirme |
 | AI asistanı | (her sayfada sağ altta) | Gözlü buton; Türkçe soru sorulur, Claude veriye bakıp cevaplar. Öneri soruları, cevapta hangi verilere bakıldığı, dashboard linkleri (sayfayı açar). Sohbet sekme kapanana kadar kalır; "+" yeni sohbet. API anahtarı yoksa nasıl açılacağını söyler (bkz. tracelens-service README "AI asistanı") |
-| Giriş | `/login` | TraceLensService'te şifre tanımlıysa açılır; girişten sonra istenen sayfaya döner. Menüde kullanıcı adı ve Çıkış |
+| Giriş / kayıt | `/login` | Hiç hesap yoksa "İlk hesabı oluşturun", varsa giriş; kayıt açıksa "Kayıt olun" (şifre tekrarıyla). Girişten sonra istenen sayfaya döner. Menüde kullanıcı adı ve Çıkış; TraceLens logosu Genel Bakış'a götürür |
 
 Oturum düşerse (API 401 döner) bulunulan sayfaya geri dönecek şekilde giriş ekranı açılır (`src/auth.ts`, `router.ts`).
 
@@ -53,7 +53,7 @@ src/
 ├─ views/            HomeView (Genel Bakış), IssuesView (Sorunlar), OverviewView (Services + Schedulers), ServiceDetailView, ServiceMapView, LiveView, ReportsView,
 │                    TraceView, AlertsView, SettingsView, LoginView
 └─ components/       KpiTile, TrendSpark, LatencyChart, OperationsTable, SpanGroupsTable, RequestsTable, StatTiles, DurationHistogram,
-                     OutcomeBreakdown, InstancesTable, RequestAnatomy, TimeSplitBar,
+                     OutcomeBreakdown, InstancesTable, RequestAnatomy, TimeSplitBar, UsersSettings,
                      StatusBadge, ThresholdCell, Waterfall, AssistantWidget (sağ alttaki AI asistanı)
 ```
 
